@@ -12,10 +12,17 @@ const path = require('path');
 // Load environment variables or config.json if present
 let config = {
   MOVIE_KEYWORD: process.env.MOVIE_KEYWORD || 'dune',
-  CITY: (process.env.CITY || 'bengaluru').toLowerCase(),
+  CITY: (process.env.CITY || 'chennai').toLowerCase(),
   FORMAT_REQUIRED: (process.env.FORMAT_REQUIRED || 'IMAX').toUpperCase(),
-  CINEMA_FILTER: (process.env.CINEMA_FILTER || '').toLowerCase(),
+  CINEMA_FILTER: (process.env.CINEMA_FILTER || 'palazzo, luxe, basera').toLowerCase(),
   POLL_INTERVAL_SECONDS: parseInt(process.env.POLL_INTERVAL_SECONDS || '60', 10),
+  
+  // Chennai IMAX Venues to track
+  CHENNAI_IMAX_SCREENS: [
+    { name: 'PVR INOX Palazzo IMAX', venue: 'The Nexus Vijaya Mall, Vadapalani', bmsCode: 'PALZ' },
+    { name: 'PVR INOX Luxe IMAX', venue: 'Phoenix Marketcity, Velachery', bmsCode: 'INLU' },
+    { name: 'PVR INOX Basera IMAX', venue: 'East Coast Road (ECR), Injambakkam', bmsCode: 'BSER' }
+  ],
   
   // Notification: Telegram
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || '',
