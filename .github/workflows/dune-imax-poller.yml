@@ -1,0 +1,37 @@
+name: Dune 3 IMAX Ticket Radar Poller
+
+on:
+  schedule:
+    # Runs every 5 minutes, 24/7 in the cloud (100% Free on GitHub Actions)
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub UI anytime
+
+concurrency:
+  group: dune-imax-poller
+  cancel-in-progress: true
+
+jobs:
+  poll-tickets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Execute Arrakis Radar Poller
+        env:
+          MOVIE_KEYWORD: ${{ secrets.MOVIE_KEYWORD || 'dune' }}
+          CITY: ${{ secrets.CITY || 'bengaluru' }}
+          FORMAT_REQUIRED: ${{ secrets.FORMAT_REQUIRED || 'IMAX' }}
+          CINEMA_FILTER: ${{ secrets.CINEMA_FILTER || '' }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          BMS_COOKIE: ${{ secrets.BMS_COOKIE }}
+        run: |
+          node poller.js --once
