@@ -22,12 +22,13 @@ export default {
 
     if (url.pathname === '/test-alert') {
       await sendAlert(env, {
-        title: 'DUNE 3: MESSIAH (IMAX 70MM / LASER)',
-        platform: 'District & BookMyShow [CLOUDFLARE TEST]',
-        url: 'https://www.district.in/movies/',
-        city: env.CITY || 'bengaluru',
-        format: 'IMAX with Laser (1.43:1)',
-        status: 'TICKETS DROPPED!',
+        title: 'DUNE 3: MESSIAH (CHENNAI IMAX LASER)',
+        platform: 'District & BookMyShow [CLOUDFLARE CHENNAI TEST]',
+        url: 'https://in.bookmyshow.com/explore/movies-chennai',
+        city: env.CITY || 'chennai',
+        cinema: 'PVR Palazzo IMAX (Nexus Vijaya) & PVR Luxe IMAX (Phoenix Velachery)',
+        format: 'IMAX Laser (1.90:1)',
+        status: 'CHENNAI IMAX TICKETS DROPPED!',
         isBookingOpen: true
       });
       return new Response(JSON.stringify({ status: 'test alert dispatched' }), {
@@ -35,7 +36,7 @@ export default {
       });
     }
 
-    return new Response('Arrakis Radar Cloudflare Worker is active. Use /trigger or /test-alert', {
+    return new Response('Arrakis Radar Cloudflare Worker is active (Chennai IMAX Mode). Use /trigger or /test-alert', {
       headers: { 'Content-Type': 'text/plain' }
     });
   }
@@ -43,7 +44,7 @@ export default {
 
 async function handleScheduledSweep(env) {
   const keyword = (env.MOVIE_KEYWORD || 'dune').toLowerCase();
-  const city = (env.CITY || 'bengaluru').toLowerCase();
+  const city = (env.CITY || 'chennai').toLowerCase();
 
   try {
     const res = await fetch('https://www.district.in/movies/', {

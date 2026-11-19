@@ -25,9 +25,9 @@ jobs:
       - name: Execute Arrakis Radar Poller
         env:
           MOVIE_KEYWORD: ${{ secrets.MOVIE_KEYWORD || 'dune' }}
-          CITY: ${{ secrets.CITY || 'bengaluru' }}
+          CITY: ${{ secrets.CITY || 'chennai' }}
           FORMAT_REQUIRED: ${{ secrets.FORMAT_REQUIRED || 'IMAX' }}
-          CINEMA_FILTER: ${{ secrets.CINEMA_FILTER || '' }}
+          CINEMA_FILTER: ${{ secrets.CINEMA_FILTER || 'palazzo, luxe, basera' }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
