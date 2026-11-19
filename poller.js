@@ -301,8 +301,9 @@ async function pollDistrict() {
           platform: 'District (Zomato)',
           url: movieUrl,
           city: config.CITY,
-          format: formats.join(' / ') || 'IMAX/2D',
-          status: isBookingOpen ? 'BOOKINGS LIVE!' : 'Listed (Notify Stage)',
+          cinema: 'PVR Palazzo IMAX (Nexus Vijaya) / PVR Luxe IMAX (Phoenix Marketcity)',
+          format: formats.join(' / ') || 'IMAX Laser (1.90:1)',
+          status: isBookingOpen ? 'BOOKINGS LIVE IN CHENNAI!' : 'Listed (Notify Stage)',
           isBookingOpen,
           hasImax,
           timestamp: new Date().toISOString()
@@ -368,8 +369,9 @@ async function pollBookMyShow() {
           platform: 'BookMyShow',
           url,
           city: config.CITY,
-          format: 'IMAX Laser / 2D',
-          status: 'BOOKINGS LIVE ON BMS!',
+          cinema: 'PVR Palazzo IMAX (Vadapalani) & PVR Luxe IMAX (Phoenix Velachery)',
+          format: 'IMAX Laser (1.90:1)',
+          status: 'BOOKINGS LIVE ON BMS CHENNAI!',
           isBookingOpen: true,
           hasImax: true,
           timestamp: new Date().toISOString()
@@ -391,8 +393,8 @@ async function pollBookMyShow() {
  */
 async function runSweep() {
   console.log(`\n========================================================`);
-  console.log(`[Arrakis Radar] Sweep started at ${new Date().toLocaleTimeString()}`);
-  console.log(`Target: "${config.MOVIE_KEYWORD}" | City: ${config.CITY} | Format: ${config.FORMAT_REQUIRED}`);
+  console.log(`[Arrakis Radar] Chennai IMAX Sweep started at ${new Date().toLocaleTimeString()}`);
+  console.log(`Target: "${config.MOVIE_KEYWORD}" | City: ${config.CITY.toUpperCase()} | Venues: Palazzo & Luxe IMAX`);
   console.log(`========================================================`);
 
   const [districtResults, bmsResults] = await Promise.all([
@@ -402,7 +404,7 @@ async function runSweep() {
 
   const all = [...districtResults, ...bmsResults];
   if (all.length === 0) {
-    console.log(`[Arrakis Radar] No open IMAX bookings for "${config.MOVIE_KEYWORD}" yet. Standing by for next sweep...`);
+    console.log(`[Arrakis Radar] No open Chennai IMAX bookings for "${config.MOVIE_KEYWORD}" yet. Standing by for next sweep...`);
   } else {
     console.log(`[Arrakis Radar] Found ${all.length} movie entries matching filters.`);
   }
@@ -413,20 +415,20 @@ async function runSweep() {
  * Run Test Alert
  */
 async function testAlert() {
-  console.log('[Test] Triggering test alert to verify notification channels...');
+  console.log('[Test] Triggering test alert to verify Chennai IMAX notification pipeline...');
   const mockTicket = {
-    title: 'DUNE 3: MESSIAH (IMAX 70MM / LASER)',
-    platform: 'District & BookMyShow [TEST ALERT]',
-    url: 'https://www.district.in/movies/',
+    title: 'DUNE 3: MESSIAH (CHENNAI IMAX LASER)',
+    platform: 'District & BookMyShow [CHENNAI IMAX TEST]',
+    url: 'https://in.bookmyshow.com/explore/movies-chennai',
     city: config.CITY,
-    cinema: 'PVR Forum Koramangala IMAX / PVR Phoenix Palladium',
-    format: 'IMAX with Laser (1.43:1)',
-    status: 'TICKETS JUST DROPPED!',
+    cinema: 'PVR Palazzo IMAX (The Nexus Vijaya Mall Vadapalani) & PVR Luxe IMAX (Phoenix Marketcity Velachery)',
+    format: 'IMAX Laser (1.90:1)',
+    status: 'CHENNAI IMAX TICKETS JUST DROPPED!',
     isBookingOpen: true,
     hasImax: true
   };
   await notifyAll(mockTicket);
-  console.log('[Test] Test alert dispatch finished. Check your Telegram/Discord/Ntfy app!');
+  console.log('[Test] Chennai IMAX test alert dispatched. Check your Telegram/Discord/Ntfy app!');
 }
 
 // CLI Execution handler

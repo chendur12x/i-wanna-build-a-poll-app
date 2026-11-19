@@ -18,9 +18,9 @@ from datetime import datetime
 # Configuration
 CONFIG = {
     "MOVIE_KEYWORD": os.getenv("MOVIE_KEYWORD", "dune").strip().lower(),
-    "CITY": os.getenv("CITY", "bengaluru").strip().lower(),
+    "CITY": os.getenv("CITY", "chennai").strip().lower(),
     "FORMAT_REQUIRED": os.getenv("FORMAT_REQUIRED", "IMAX").strip().upper(),
-    "CINEMA_FILTER": os.getenv("CINEMA_FILTER", "").strip().lower(),
+    "CINEMA_FILTER": os.getenv("CINEMA_FILTER", "palazzo, luxe, basera").strip().lower(),
     "POLL_INTERVAL_SECONDS": int(os.getenv("POLL_INTERVAL_SECONDS", "60")),
     
     # Telegram credentials
@@ -249,27 +249,27 @@ def poll_bms():
 
 def run_sweep():
     print(f"\n========================================================")
-    print(f"[Arrakis Radar] Sweep started at {datetime.now().strftime('%H:%M:%S')}")
-    print(f"Target: '{CONFIG['MOVIE_KEYWORD']}' | City: {CONFIG['CITY']} | Format: {CONFIG['FORMAT_REQUIRED']}")
+    print(f"[Arrakis Radar] Chennai IMAX Sweep started at {datetime.now().strftime('%H:%M:%S')}")
+    print(f"Target: '{CONFIG['MOVIE_KEYWORD']}' | City: {CONFIG['CITY'].upper()} | Venues: Palazzo & Luxe IMAX")
     print(f"========================================================")
 
     res_district = poll_district()
     res_bms = poll_bms()
     all_res = res_district + res_bms
     if not all_res:
-        print(f"[Arrakis Radar] No open IMAX bookings for '{CONFIG['MOVIE_KEYWORD']}' yet. Standing by...")
+        print(f"[Arrakis Radar] No open Chennai IMAX bookings for '{CONFIG['MOVIE_KEYWORD']}' yet. Standing by...")
     return all_res
 
 def test_alert():
-    print("[Test] Sending simulated Dune 3 IMAX test alert to configured channels...")
+    print("[Test] Sending simulated Dune 3 Chennai IMAX test alert to configured channels...")
     mock = {
-        "title": "DUNE 3: MESSIAH (IMAX 70MM / LASER)",
-        "platform": "District & BookMyShow [TEST ALERT]",
-        "url": "https://www.district.in/movies/",
+        "title": "DUNE 3: MESSIAH (CHENNAI IMAX LASER)",
+        "platform": "District & BookMyShow [CHENNAI TEST]",
+        "url": "https://in.bookmyshow.com/explore/movies-chennai",
         "city": CONFIG["CITY"],
-        "cinema": "PVR Forum Koramangala IMAX / PVR Phoenix Palladium",
-        "format": "IMAX with Laser (1.43:1)",
-        "status": "TICKETS JUST DROPPED!",
+        "cinema": "PVR Palazzo IMAX (Nexus Vijaya Vadapalani) & PVR Luxe IMAX (Phoenix Velachery)",
+        "format": "IMAX Laser (1.90:1)",
+        "status": "CHENNAI IMAX TICKETS LIVE!",
         "isBookingOpen": True,
         "hasImax": True
     }
