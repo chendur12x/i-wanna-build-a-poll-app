@@ -40,6 +40,18 @@
       "created_at": "2026-11-19T19:34:12.146Z",
       "sender": "ios",
       "is_cancelled": false
+    },
+    {
+      "id": "45b87c9f-8fd8-48be-a8ca-712725acf221",
+      "role": "agent",
+      "content": "Yes! It's completely built and live. You can open and test it right now:\n\n👉 **[Open Arrakis Radar Web App](https://antigravity.luch.dev/site/5bb2e433-9e8d-4222-bbcf-f831ae6d9580/832fb02ac2c9c49e2c256a41/)**\n\n### What’s Ready For You:\n1. **Interactive Web Dashboard** ([index.html](file:///home/agent/workspace/index.html)):\n   - Live radar sweep for **District** and **BookMyShow** across Indian IMAX cities (Bengaluru, Mumbai, Delhi-NCR, Hyderabad, Chennai, etc.).\n   - Built-in **Hans Zimmer Dune Horn & IMAX Siren** acoustic synthesizer.\n   - **Simulate Drop** button to preview how ticket notifications trigger.\n   - 1-click test alert pings for **Telegram**, **ntfy.sh (free phone push)**, and **Discord**.\n2. **Dual-Platform Poller Engine** ([poller.js](file:///home/agent/workspace/poller.js) & [poller.py](file:///home/agent/workspace/poller.py)):\n   - Actively scrapes District's catalog (430+ titles) and BMS explore listings with zero dependencies, parses IMAX formats, and detects open bookings.\n3. **100% Free 24/7 Cloud Poller** ([.github/workflows/dune-imax-poller.yml](file:///home/agent/workspace/.github/workflows/dune-imax-poller.yml)):\n   - Scheduled to run on GitHub Actions every 5 minutes in the cloud so you don't have to keep your computer awake.\n   - To activate the 24/7 cloud poller, **tap the GitHub mark at the top of the chat** to connect a repository — your entire project and workflow will go there automatically!",
+      "status": "completed",
+      "model": "gemini-3.8-flash-high",
+      "client_type": "gemini-bridge",
+      "parent_message_id": "87087c6d-92c1-46be-83cf-96607edf250f",
+      "created_at": "2026-11-19T19:34:31.917Z",
+      "sender": "macOS",
+      "is_cancelled": false
     }
   ]
 }
