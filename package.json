@@ -1,0 +1,23 @@
+{
+  "name": "dune3-imax-ticket-radar",
+  "version": "1.0.0",
+  "description": "Real-time ticket tracker and poller for Dune 3 IMAX tickets on District and BookMyShow with instant Telegram, Discord, and Push notifications.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "poll": "node poller.js",
+    "poll:once": "node poller.js --once",
+    "test:alert": "node poller.js --test-alert"
+  },
+  "keywords": [
+    "dune-3",
+    "imax",
+    "district",
+    "bookmyshow",
+    "ticket-tracker",
+    "ticket-alert",
+    "telegram-bot"
+  ],
+  "author": "Antigravity",
+  "license": "MIT"
+}
