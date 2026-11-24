@@ -1,56 +1,96 @@
 /**
- * ARRAKIS RADAR - Cloudflare Worker Edge Poller
- * 100% Free on Cloudflare Workers (100,000 requests/day free tier)
- * Runs automatically on a Cron Trigger every 1-5 minutes!
+ * ARRAKIS RADAR - Cloudflare Worker Edge Poller (Mission-Critical Edition)
+ * Surveillance Rules:
+ * 1. Basera Mall Alone (All shows/dates)
+ * 2. Other Theatres: 16th Shows Alone (New shows only)
  */
 
 export default {
-  // Cron trigger handler
   async scheduled(event, env, ctx) {
     ctx.waitUntil(handleScheduledSweep(env));
   },
 
-  // HTTP request handler for manual trigger or health check
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
     if (url.pathname === '/trigger') {
       const results = await handleScheduledSweep(env);
-      return new Response(JSON.stringify({ status: 'ok', results }), {
+      return new Response(JSON.stringify({ status: 'ok', count: results.length, results }), {
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
     if (url.pathname === '/test-alert') {
-      await sendAlert(env, {
+      const mockBasera = {
         title: 'DUNE 3: MESSIAH (CHENNAI IMAX LASER)',
-        platform: 'District & BookMyShow [CLOUDFLARE CHENNAI TEST]',
+        platform: 'Cloudflare Worker [EDGE TEST]',
+        url: 'https://in.bookmyshow.com/cinemas/che/pvr-inox-basera-ecr-chennai/buytickets/BSER/',
+        city: env.CITY || 'chennai',
+        cinema: 'PVR INOX Basera Mall (ECR)',
+        showDate: 'All Open Dates',
+        format: 'IMAX Laser (1.90:1)',
+        status: 'BASERA MALL TICKETS LIVE!',
+        badge: '🏛️ BASERA MALL (ALL DATES)'
+      };
+      const mock16th = {
+        title: 'DUNE 3: MESSIAH (CHENNAI IMAX LASER)',
+        platform: 'Cloudflare Worker [EDGE TEST]',
         url: 'https://in.bookmyshow.com/explore/movies-chennai',
         city: env.CITY || 'chennai',
-        cinema: 'PVR Palazzo IMAX (Nexus Vijaya) & PVR Luxe IMAX (Phoenix Velachery)',
+        cinema: 'PVR INOX Palazzo IMAX (Nexus Vijaya)',
+        showDate: 'December 16th (Special Fan Show)',
         format: 'IMAX Laser (1.90:1)',
-        status: 'CHENNAI IMAX TICKETS DROPPED!',
-        isBookingOpen: true
-      });
-      return new Response(JSON.stringify({ status: 'test alert dispatched' }), {
+        status: '16TH SHOW ADDED AT PALAZZO!',
+        badge: '📅 16TH SHOW EXCLUSIVE (Palazzo IMAX)'
+      };
+      await sendAlert(env, mockBasera);
+      await sendAlert(env, mock16th);
+      return new Response(JSON.stringify({ status: 'ok', message: 'Test alerts dispatched for Basera Mall and 16th Show' }), {
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    return new Response('Arrakis Radar Cloudflare Worker is active (Chennai IMAX Mode). Use /trigger or /test-alert', {
+    return new Response('Arrakis Radar Cloudflare Worker is active (Mission Critical Mode: Basera Mall Alone + Other Theatres 16th Alone).', {
       headers: { 'Content-Type': 'text/plain' }
     });
   }
 };
+
+function evaluateShowEligibility(cinemaName, showDate, venueDetails = '') {
+  const cinemaText = `${cinemaName || ''} ${venueDetails || ''}`.toLowerCase();
+  const dateStr = String(showDate || '').toLowerCase();
+
+  // Rule 1: Basera Mall
+  if (cinemaText.includes('basera')) {
+    return {
+      eligible: true,
+      badge: '🏛️ BASERA MALL (ALL DATES)',
+      cinema: cinemaName || 'PVR INOX Basera Mall (ECR)',
+      date: showDate || 'All Open Dates'
+    };
+  }
+
+  // Rule 2: Other Theatres - 16th show alone
+  const is16th = /(?:^|\D)16(?:th)?(?:\D|$)|-16\b|16-|\b16\b/i.test(dateStr);
+  if (is16th) {
+    return {
+      eligible: true,
+      badge: `📅 16TH SHOW EXCLUSIVE (${cinemaName || 'Other Theatre'})`,
+      cinema: cinemaName || 'Other Chennai Multiplex',
+      date: showDate || '16th'
+    };
+  }
+
+  return { eligible: false };
+}
 
 async function handleScheduledSweep(env) {
   const keyword = (env.MOVIE_KEYWORD || 'dune').toLowerCase();
   const city = (env.CITY || 'chennai').toLowerCase();
 
   try {
-    const res = await fetch('https://www.district.in/movies/', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
+    const res = await fetch(`https://www.district.in/movies/${city}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
     });
 
     if (!res.ok) return [];
@@ -71,17 +111,47 @@ async function handleScheduledSweep(env) {
       const isBookingOpen = /book\s*tickets?|available|filling\s*fast/i.test(pageHtml);
       const hasImax = /IMAX/i.test(pageHtml) || /IMAX/i.test(slug);
 
-      if (isBookingOpen && hasImax) {
-        const ticket = {
-          title: slug.replace(/-movie-tickets.*$/, '').replace(/-/g, ' ').toUpperCase(),
-          platform: 'District (Zomato)',
-          url: `https://www.district.in/movies/${slug}`,
-          city,
-          format: 'IMAX Laser',
-          status: 'BOOKINGS LIVE NOW!'
-        };
-        discoveries.push(ticket);
-        await sendAlert(env, ticket);
+      // Check Basera
+      if (/basera/i.test(pageHtml)) {
+        const evalRes = evaluateShowEligibility('PVR INOX Basera Mall (ECR)', 'Live on District');
+        if (evalRes.eligible) {
+          const item = {
+            title: slug.replace(/-movie-tickets.*$/, '').replace(/-/g, ' ').toUpperCase(),
+            platform: 'District (Zomato)',
+            url: `https://www.district.in/movies/${slug}`,
+            city,
+            cinema: evalRes.cinema,
+            showDate: evalRes.date,
+            format: hasImax ? 'IMAX Laser' : 'Standard',
+            status: isBookingOpen ? 'BOOKINGS LIVE NOW!' : 'Showtimes Listed',
+            badge: evalRes.badge
+          };
+          discoveries.push(item);
+          await sendAlert(env, item);
+        }
+      }
+
+      // Check 16th shows
+      const dateMatches = pageHtml.match(/(?:16th\s+[A-Za-z]+|[A-Za-z]+\s+16th|2026-12-16|2026-[0-9]{2}-16)/gi);
+      if (dateMatches) {
+        for (const dm of new Set(dateMatches)) {
+          const evalRes = evaluateShowEligibility('Chennai Multiplex', dm);
+          if (evalRes.eligible) {
+            const item = {
+              title: slug.replace(/-movie-tickets.*$/, '').replace(/-/g, ' ').toUpperCase(),
+              platform: 'District (Zomato)',
+              url: `https://www.district.in/movies/${slug}`,
+              city,
+              cinema: evalRes.cinema,
+              showDate: dm,
+              format: hasImax ? 'IMAX Laser' : 'Standard',
+              status: isBookingOpen ? '16TH SHOW LIVE NOW!' : '16th Show Listed',
+              badge: evalRes.badge
+            };
+            discoveries.push(item);
+            await sendAlert(env, item);
+          }
+        }
       }
     }
     return discoveries;
@@ -94,7 +164,7 @@ async function handleScheduledSweep(env) {
 async function sendAlert(env, ticket) {
   // Telegram
   if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID) {
-    const text = `🚨 *DUNE 3 IMAX TICKETS DETECTED!* 🚨\n\n🎬 *Title:* ${ticket.title}\n📍 *Platform:* ${ticket.platform}\n🏙️ *City:* ${ticket.city.toUpperCase()}\n🎞️ *Format:* ${ticket.format}\n🎟️ *Status:* *${ticket.status}*\n\n🔗 [BOOK TICKETS IMMEDIATELY](${ticket.url})`;
+    const text = `🚨 *DUNE 3 TICKETS DETECTED!* 🚨\n\n🎯 *Match:* ${ticket.badge}\n🎬 *Title:* ${ticket.title}\n🏛️ *Cinema:* ${ticket.cinema}\n📅 *Date:* ${ticket.showDate}\n📍 *Platform:* ${ticket.platform}\n🎟️ *Status:* *${ticket.status}*\n\n🔗 [BOOK TICKETS IMMEDIATELY](${ticket.url})`;
     await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -112,11 +182,11 @@ async function sendAlert(env, ticket) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        content: '🚨 @everyone **DUNE 3 IMAX TICKETS ARE LIVE!** 🎟️',
+        content: `🚨 @everyone **${ticket.badge}** 🎟️`,
         embeds: [{
-          title: `🔥 ${ticket.title} (${ticket.format})`,
+          title: `🔥 ${ticket.title} — ${ticket.cinema}`,
           url: ticket.url,
-          description: `Booking is open on **${ticket.platform}**!`,
+          description: `Booking is active on **${ticket.platform}**!`,
           color: 0xe5a93c
         }]
       })
@@ -129,12 +199,12 @@ async function sendAlert(env, ticket) {
     await fetch(`https://ntfy.sh/${topic}`, {
       method: 'POST',
       headers: {
-        'Title': '🚨 DUNE 3 IMAX TICKETS LIVE!',
+        'Title': ticket.badge,
         'Priority': 'urgent',
         'Tags': 'warning,ticket,fire',
         'Click': ticket.url
       },
-      body: `${ticket.title} is now available on ${ticket.platform}! Tap to book!`
+      body: `${ticket.title} at ${ticket.cinema} (${ticket.showDate}) is LIVE!`
     });
   }
 }

@@ -2,9 +2,20 @@ name: Dune 3 IMAX Ticket Radar Poller
 
 on:
   schedule:
-    # Runs every 5 minutes, 24/7 in the cloud (100% Free on GitHub Actions)
+    # Autonomous cloud poller: runs every 5 minutes around the clock
     - cron: '*/5 * * * *'
-  workflow_dispatch: # Allows manual trigger from GitHub UI anytime
+  workflow_dispatch:
+    inputs:
+      test_alert:
+        description: 'Send test alert to verify notification channels'
+        required: false
+        type: boolean
+        default: false
+      movie_keyword:
+        description: 'Target movie keyword (e.g. dune)'
+        required: false
+        type: string
+        default: 'dune'
 
 concurrency:
   group: dune-imax-poller
@@ -13,6 +24,8 @@ concurrency:
 jobs:
   poll-tickets:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,16 +35,31 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Execute Arrakis Radar Poller
+      - name: Restore Deduplication State Cache
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: radar-state-${{ github.run_id }}
+          restore-keys: |
+            radar-state-
+
+      - name: Execute Mission-Critical Radar Poller
         env:
-          MOVIE_KEYWORD: ${{ secrets.MOVIE_KEYWORD || 'dune' }}
+          MOVIE_KEYWORD: ${{ inputs.movie_keyword || secrets.MOVIE_KEYWORD || 'dune' }}
           CITY: ${{ secrets.CITY || 'chennai' }}
           FORMAT_REQUIRED: ${{ secrets.FORMAT_REQUIRED || 'IMAX' }}
-          CINEMA_FILTER: ${{ secrets.CINEMA_FILTER || 'palazzo, luxe, basera' }}
+          PRIMARY_CINEMA: ${{ secrets.PRIMARY_CINEMA || 'basera' }}
+          SECONDARY_CINEMA_DATE: ${{ secrets.SECONDARY_CINEMA_DATE || '16' }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           BMS_COOKIE: ${{ secrets.BMS_COOKIE }}
         run: |
+          mkdir -p .cache
+          if [ "${{ inputs.test_alert }}" = "true" ]; then
+            echo "[Workflow] Running simulated test alert verification..."
+            node poller.js --test-alert
+          fi
+          echo "[Workflow] Running mission-critical radar sweep..."
           node poller.js --once
