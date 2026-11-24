@@ -48,7 +48,7 @@ let config = {
   TO_PHONE_NUMBER: (process.env.TO_PHONE_NUMBER || '').trim(),
 
   // Phone Call Alerts: CallMeBot Telegram Voice Call (100% Free automated voice call)
-  CALLMEBOT_TELEGRAM_USER: (process.env.CALLMEBOT_TELEGRAM_USER || '').trim()
+  CALLMEBOT_TELEGRAM_USER: (process.env.CALLMEBOT_TELEGRAM_USER || 'chendur12').trim()
 };
 
 // Merge config.json if present locally

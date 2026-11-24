@@ -59,7 +59,7 @@ jobs:
           TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
           TWILIO_FROM_NUMBER: ${{ secrets.TWILIO_FROM_NUMBER }}
           TO_PHONE_NUMBER: ${{ secrets.TO_PHONE_NUMBER }}
-          CALLMEBOT_TELEGRAM_USER: ${{ secrets.CALLMEBOT_TELEGRAM_USER }}
+          CALLMEBOT_TELEGRAM_USER: ${{ secrets.CALLMEBOT_TELEGRAM_USER || 'chendur12' }}
         run: |
           mkdir -p .cache
           if [ "${{ inputs.test_alert }}" = "true" ]; then

@@ -742,7 +742,7 @@
                 <label class="block text-xs font-mono text-slate-300 mb-1">Your Telegram Username</label>
                 <div class="flex">
                   <span class="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-obsidian-700 bg-obsidian-950 text-slate-500 text-xs font-mono">@</span>
-                  <input type="text" id="cfgCallMeBotUser" placeholder="your_telegram_username" class="w-full bg-obsidian-950 border border-obsidian-700 rounded-r-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-spice-500">
+                  <input type="text" id="cfgCallMeBotUser" placeholder="your_telegram_username" value="chendur12" class="w-full bg-obsidian-950 border border-obsidian-700 rounded-r-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-spice-500">
                 </div>
               </div>
             </div>
@@ -994,7 +994,7 @@ jobs:
       const savedTwilioToken = localStorage.getItem('dune_twilio_token') || '';
       const savedTwilioFrom = localStorage.getItem('dune_twilio_from') || '';
       const savedTwilioTo = localStorage.getItem('dune_twilio_to') || '';
-      const savedCallMeBot = localStorage.getItem('dune_callmebot_user') || '';
+      const savedCallMeBot = localStorage.getItem('dune_callmebot_user') || 'chendur12';
 
       if (document.getElementById('cfgTelegramToken')) document.getElementById('cfgTelegramToken').value = savedToken;
       if (document.getElementById('cfgTelegramChatId')) document.getElementById('cfgTelegramChatId').value = savedChatId;
