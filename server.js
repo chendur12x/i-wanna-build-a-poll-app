@@ -52,11 +52,21 @@ const server = http.createServer(async (req, res) => {
         const origChat = config.TELEGRAM_CHAT_ID;
         const origWebhook = config.DISCORD_WEBHOOK_URL;
         const origTopic = config.NTFY_TOPIC;
+        const origTwilioSid = config.TWILIO_ACCOUNT_SID;
+        const origTwilioToken = config.TWILIO_AUTH_TOKEN;
+        const origTwilioFrom = config.TWILIO_FROM_NUMBER;
+        const origTwilioTo = config.TO_PHONE_NUMBER;
+        const origCallMeBot = config.CALLMEBOT_TELEGRAM_USER;
 
         if (customCfg.telegramToken) config.TELEGRAM_BOT_TOKEN = customCfg.telegramToken;
         if (customCfg.telegramChatId) config.TELEGRAM_CHAT_ID = customCfg.telegramChatId;
         if (customCfg.discordWebhook) config.DISCORD_WEBHOOK_URL = customCfg.discordWebhook;
         if (customCfg.ntfyTopic) config.NTFY_TOPIC = customCfg.ntfyTopic;
+        if (customCfg.twilioSid) config.TWILIO_ACCOUNT_SID = customCfg.twilioSid;
+        if (customCfg.twilioToken) config.TWILIO_AUTH_TOKEN = customCfg.twilioToken;
+        if (customCfg.twilioFrom) config.TWILIO_FROM_NUMBER = customCfg.twilioFrom;
+        if (customCfg.twilioTo) config.TO_PHONE_NUMBER = customCfg.twilioTo;
+        if (customCfg.callmebotUser) config.CALLMEBOT_TELEGRAM_USER = customCfg.callmebotUser;
 
         await testAlert();
 
@@ -65,6 +75,11 @@ const server = http.createServer(async (req, res) => {
         config.TELEGRAM_CHAT_ID = origChat;
         config.DISCORD_WEBHOOK_URL = origWebhook;
         config.NTFY_TOPIC = origTopic;
+        config.TWILIO_ACCOUNT_SID = origTwilioSid;
+        config.TWILIO_AUTH_TOKEN = origTwilioToken;
+        config.TWILIO_FROM_NUMBER = origTwilioFrom;
+        config.TO_PHONE_NUMBER = origTwilioTo;
+        config.CALLMEBOT_TELEGRAM_USER = origCallMeBot;
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, message: 'Test alert dispatched successfully' }));

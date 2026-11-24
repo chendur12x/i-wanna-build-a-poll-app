@@ -208,4 +208,43 @@ async function sendAlert(env, ticket) {
       body: `${ticket.title} at ${ticket.cinema} (${ticket.showDate}) is LIVE!`
     });
   }
+
+  // Voice Call Alerts (Twilio & CallMeBot)
+  const isBasera = ticket.ruleType === 'BASERA_MALL_EXCLUSIVE';
+  const spoken = isBasera
+    ? `Urgent ticket alert! Dune 3 tickets are now live at Basera Mall Chennai. Book immediately!`
+    : `Urgent ticket alert! A new 16th show has just been added at ${ticket.cinema || 'Chennai multiplex'}. Book now!`;
+
+  // 1. Twilio Voice Call
+  if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM_NUMBER && env.TO_PHONE_NUMBER) {
+    try {
+      const twiml = `<Response><Pause length="1"/><Say voice="Polly.Aditi" language="en-IN">${spoken}</Say><Pause length="1"/><Say voice="Polly.Aditi" language="en-IN">${spoken}</Say></Response>`;
+      const auth = btoa(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`);
+      const body = new URLSearchParams({
+        To: env.TO_PHONE_NUMBER,
+        From: env.TWILIO_FROM_NUMBER,
+        Twiml: twiml
+      });
+      await fetch(`https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Calls.json`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: body.toString()
+      });
+    } catch (e) {
+      console.error('Twilio error:', e);
+    }
+  }
+
+  // 2. CallMeBot Free Telegram Voice Call
+  if (env.CALLMEBOT_TELEGRAM_USER) {
+    try {
+      const tg = env.CALLMEBOT_TELEGRAM_USER.replace('@', '').trim();
+      await fetch(`https://api.callmebot.com/start.php?user=@${tg}&text=${encodeURIComponent(spoken)}&lang=en-US-Standard-B`);
+    } catch (e) {
+      console.error('CallMeBot error:', e);
+    }
+  }
 }

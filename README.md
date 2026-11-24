@@ -43,6 +43,11 @@ In GitHub repository **Settings** → **Secrets and variables** → **Actions**:
 | `DISCORD_WEBHOOK_URL` | Discord webhook URL | *(optional)* |
 | `NTFY_TOPIC` | ntfy.sh topic for instant phone push | *(optional)* |
 | `BMS_COOKIE` | Optional BookMyShow session cookie | *(optional)* |
+| `TWILIO_ACCOUNT_SID` | Twilio Account SID for cellular phone calls | *(optional)* |
+| `TWILIO_AUTH_TOKEN` | Twilio Auth Token | *(optional)* |
+| `TWILIO_FROM_NUMBER` | Twilio phone number (e.g. `+1234567890`) | *(optional)* |
+| `TO_PHONE_NUMBER` | Your cellular phone number to ring (e.g. `+919876543210`) | *(optional)* |
+| `CALLMEBOT_TELEGRAM_USER` | Your Telegram username for **100% Free automated voice call** | *(optional)* |
 
 ---
 

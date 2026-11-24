@@ -715,6 +715,76 @@
           </div>
         </div>
 
+        <!-- 5. Automated Voice Phone Call Alerts -->
+        <div class="bg-obsidian-900 border border-obsidian-800 rounded-2xl p-5 space-y-4">
+          <div class="flex items-center justify-between border-b border-obsidian-800 pb-3">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+                <i data-lucide="phone-call" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-white text-sm">Automated Voice Call Alerts</h3>
+                <p class="text-[11px] text-slate-400 font-mono">Real phone call dialed when tickets drop</p>
+              </div>
+            </div>
+            <span class="text-[10px] font-mono text-emerald-400 px-2 py-0.5 rounded bg-emerald-950 border border-emerald-800">Mission Critical</span>
+          </div>
+
+          <div class="space-y-3">
+            <!-- Option A: Free CallMeBot Telegram Call -->
+            <div class="p-3 rounded-xl bg-obsidian-950 border border-obsidian-800 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-mono font-bold text-white">Option 1: Free Telegram Voice Call</span>
+                <span class="text-[9px] font-mono text-cyan-400 bg-cyan-950 px-1.5 py-0.5 rounded border border-cyan-800">100% Free • No Signup</span>
+              </div>
+              <p class="text-[11px] text-slate-400">Rings your phone via Telegram with an automated voice call reading the alert.</p>
+              <div>
+                <label class="block text-xs font-mono text-slate-300 mb-1">Your Telegram Username</label>
+                <div class="flex">
+                  <span class="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-obsidian-700 bg-obsidian-950 text-slate-500 text-xs font-mono">@</span>
+                  <input type="text" id="cfgCallMeBotUser" placeholder="your_telegram_username" class="w-full bg-obsidian-950 border border-obsidian-700 rounded-r-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-spice-500">
+                </div>
+              </div>
+            </div>
+
+            <!-- Option B: Cellular Phone Call via Twilio -->
+            <div class="p-3 rounded-xl bg-obsidian-950 border border-obsidian-800 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-mono font-bold text-white">Option 2: Direct Cellular Phone Call (Twilio)</span>
+                <span class="text-[9px] font-mono text-amber-400 bg-amber-950 px-1.5 py-0.5 rounded border border-amber-800">Direct Cellular Call</span>
+              </div>
+              <p class="text-[11px] text-slate-400">Dials your actual phone number directly over cellular network with Text-to-Speech speech.</p>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-[11px] font-mono text-slate-300 mb-1">Your Phone Number</label>
+                  <input type="text" id="cfgTwilioTo" placeholder="+919876543210" class="w-full bg-obsidian-950 border border-obsidian-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-spice-500">
+                </div>
+                <div>
+                  <label class="block text-[11px] font-mono text-slate-300 mb-1">Twilio From Number</label>
+                  <input type="text" id="cfgTwilioFrom" placeholder="+1234567890" class="w-full bg-obsidian-950 border border-obsidian-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-spice-500">
+                </div>
+                <div>
+                  <label class="block text-[11px] font-mono text-slate-300 mb-1">Twilio Account SID</label>
+                  <input type="password" id="cfgTwilioSid" placeholder="ACxxxxxxxxxxxxxxxx" class="w-full bg-obsidian-950 border border-obsidian-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-spice-500">
+                </div>
+                <div>
+                  <label class="block text-[11px] font-mono text-slate-300 mb-1">Twilio Auth Token</label>
+                  <input type="password" id="cfgTwilioToken" placeholder="Auth Token" class="w-full bg-obsidian-950 border border-obsidian-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-spice-500">
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 pt-1">
+              <button onclick="saveNotificationSettings()" class="px-4 py-2 rounded-xl text-xs font-mono font-bold bg-obsidian-800 hover:bg-obsidian-700 border border-obsidian-700 text-slate-200 transition">
+                Save
+              </button>
+              <button onclick="testVoiceCallAlert()" class="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-mono font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-lg shadow-emerald-600/20">
+                <i data-lucide="phone-outgoing" class="w-3.5 h-3.5"></i> Test Voice Call Now
+              </button>
+            </div>
+          </div>
+        </div>
+
       </div>
 
     </div>
@@ -920,11 +990,21 @@ jobs:
       const savedMovie = localStorage.getItem('dune_movie') || 'dune';
       const savedCity = localStorage.getItem('dune_city') || 'chennai';
       const savedCinema = localStorage.getItem('dune_cinema') || 'Palazzo, Luxe, Basera';
+      const savedTwilioSid = localStorage.getItem('dune_twilio_sid') || '';
+      const savedTwilioToken = localStorage.getItem('dune_twilio_token') || '';
+      const savedTwilioFrom = localStorage.getItem('dune_twilio_from') || '';
+      const savedTwilioTo = localStorage.getItem('dune_twilio_to') || '';
+      const savedCallMeBot = localStorage.getItem('dune_callmebot_user') || '';
 
       if (document.getElementById('cfgTelegramToken')) document.getElementById('cfgTelegramToken').value = savedToken;
       if (document.getElementById('cfgTelegramChatId')) document.getElementById('cfgTelegramChatId').value = savedChatId;
       if (document.getElementById('cfgNtfyTopic')) document.getElementById('cfgNtfyTopic').value = savedNtfy;
       if (document.getElementById('cfgDiscordWebhook')) document.getElementById('cfgDiscordWebhook').value = savedDiscord;
+      if (document.getElementById('cfgTwilioSid')) document.getElementById('cfgTwilioSid').value = savedTwilioSid;
+      if (document.getElementById('cfgTwilioToken')) document.getElementById('cfgTwilioToken').value = savedTwilioToken;
+      if (document.getElementById('cfgTwilioFrom')) document.getElementById('cfgTwilioFrom').value = savedTwilioFrom;
+      if (document.getElementById('cfgTwilioTo')) document.getElementById('cfgTwilioTo').value = savedTwilioTo;
+      if (document.getElementById('cfgCallMeBotUser')) document.getElementById('cfgCallMeBotUser').value = savedCallMeBot;
       if (document.getElementById('targetMovie')) document.getElementById('targetMovie').value = savedMovie;
       if (document.getElementById('targetCity')) document.getElementById('targetCity').value = savedCity;
       if (document.getElementById('targetCinema')) document.getElementById('targetCinema').value = savedCinema;
@@ -934,19 +1014,29 @@ jobs:
     }
 
     function saveNotificationSettings() {
-      const token = document.getElementById('cfgTelegramToken').value.trim();
-      const chat = document.getElementById('cfgTelegramChatId').value.trim();
-      const ntfy = document.getElementById('cfgNtfyTopic').value.trim();
-      const discord = document.getElementById('cfgDiscordWebhook').value.trim();
+      const token = document.getElementById('cfgTelegramToken')?.value.trim() || '';
+      const chat = document.getElementById('cfgTelegramChatId')?.value.trim() || '';
+      const ntfy = document.getElementById('cfgNtfyTopic')?.value.trim() || '';
+      const discord = document.getElementById('cfgDiscordWebhook')?.value.trim() || '';
+      const twilioSid = document.getElementById('cfgTwilioSid')?.value.trim() || '';
+      const twilioToken = document.getElementById('cfgTwilioToken')?.value.trim() || '';
+      const twilioFrom = document.getElementById('cfgTwilioFrom')?.value.trim() || '';
+      const twilioTo = document.getElementById('cfgTwilioTo')?.value.trim() || '';
+      const callmebot = document.getElementById('cfgCallMeBotUser')?.value.trim() || '';
 
       localStorage.setItem('dune_tg_token', token);
       localStorage.setItem('dune_tg_chat', chat);
       localStorage.setItem('dune_ntfy_topic', ntfy);
       localStorage.setItem('dune_discord', discord);
+      localStorage.setItem('dune_twilio_sid', twilioSid);
+      localStorage.setItem('dune_twilio_token', twilioToken);
+      localStorage.setItem('dune_twilio_from', twilioFrom);
+      localStorage.setItem('dune_twilio_to', twilioTo);
+      localStorage.setItem('dune_callmebot_user', callmebot);
 
-      log(`[CONFIG] Chennai IMAX notification credentials saved to local browser storage.`);
+      log(`[CONFIG] Notification credentials saved to local browser storage.`);
       updateConfigPreviews();
-      alert('Notification settings saved successfully!');
+      alert('Notification & Voice Call settings saved successfully!');
     }
 
     function updateConfigPreviews() {
@@ -1265,6 +1355,59 @@ DISCORD_WEBHOOK_URL="${cfg.DISCORD_WEBHOOK_URL}"`;
       } catch (e) {
         log(`[DISCORD] Error: ${e.message}`, 'warn');
         alert(`Discord error: ${e.message}`);
+      }
+    }
+
+    // Direct Voice Call Alert Test (Twilio Cellular & CallMeBot Free Telegram Voice Call)
+    async function testVoiceCallAlert() {
+      const twilioSid = document.getElementById('cfgTwilioSid')?.value.trim() || '';
+      const twilioToken = document.getElementById('cfgTwilioToken')?.value.trim() || '';
+      const twilioFrom = document.getElementById('cfgTwilioFrom')?.value.trim() || '';
+      const twilioTo = document.getElementById('cfgTwilioTo')?.value.trim() || '';
+      const callmebotUser = document.getElementById('cfgCallMeBotUser')?.value.trim().replace(/^@/, '') || '';
+
+      if (!callmebotUser && (!twilioSid || !twilioToken || !twilioFrom || !twilioTo)) {
+        alert('Please configure either:\n1. Your Telegram username for Free Telegram Voice Call, OR\n2. Twilio credentials & phone numbers for Cellular Call.');
+        return;
+      }
+
+      saveNotificationSettings();
+      log('[VOICE CALL] Dispatching automated test phone call...');
+
+      // 1. If running on local server, call /api/test-alert
+      try {
+        const res = await fetch('/api/test-alert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            twilioSid,
+            twilioToken,
+            twilioFrom,
+            twilioTo,
+            callmebotUser
+          })
+        });
+
+        if (res.ok) {
+          log('[VOICE CALL] Voice call initiated successfully via backend poller!', 'success');
+          alert('Automated voice call initiated! Your phone will ring shortly.');
+          return;
+        }
+      } catch (_) {
+        // Fallback for standalone static browser
+      }
+
+      // 2. Direct CallMeBot trigger if in static browser without local server
+      if (callmebotUser) {
+        try {
+          const msg = encodeURIComponent('Urgent alert! Dune 3 tickets are live at Basera Mall Chennai. Book tickets immediately!');
+          const callUrl = `https://api.callmebot.com/start.php?user=@${callmebotUser}&text=${msg}&lang=en-US-Standard-B`;
+          log(`[VOICE CALL] Triggering Telegram voice call for @${callmebotUser}...`);
+          window.open(callUrl, '_blank', 'width=400,height=300');
+          alert(`Telegram voice call triggered for @${callmebotUser}! Check your Telegram app for incoming call.`);
+        } catch (err) {
+          alert(`Voice call trigger error: ${err.message}`);
+        }
       }
     }
 

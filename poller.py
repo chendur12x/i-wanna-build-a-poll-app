@@ -36,7 +36,16 @@ CONFIG = {
     "TELEGRAM_CHAT_ID": os.getenv("TELEGRAM_CHAT_ID", "").strip(),
     "DISCORD_WEBHOOK_URL": os.getenv("DISCORD_WEBHOOK_URL", "").strip(),
     "NTFY_TOPIC": os.getenv("NTFY_TOPIC", "").strip(),
-    "BMS_COOKIE": os.getenv("BMS_COOKIE", "").strip()
+    "BMS_COOKIE": os.getenv("BMS_COOKIE", "").strip(),
+    
+    # Phone Call: Twilio Voice Call
+    "TWILIO_ACCOUNT_SID": os.getenv("TWILIO_ACCOUNT_SID", "").strip(),
+    "TWILIO_AUTH_TOKEN": os.getenv("TWILIO_AUTH_TOKEN", "").strip(),
+    "TWILIO_FROM_NUMBER": os.getenv("TWILIO_FROM_NUMBER", "").strip(),
+    "TO_PHONE_NUMBER": os.getenv("TO_PHONE_NUMBER", "").strip(),
+
+    # Phone Call: CallMeBot Telegram Voice Call (Free)
+    "CALLMEBOT_TELEGRAM_USER": os.getenv("CALLMEBOT_TELEGRAM_USER", "").strip()
 }
 
 config_json = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
@@ -214,6 +223,52 @@ def send_ntfy(ticket):
     post_json(f"https://ntfy.sh/{topic}", body, headers=headers)
     print(f"[Alert/Ntfy] Push sent to topic '{topic}'!")
 
+def send_voice_call(ticket):
+    is_basera = ticket.get("ruleType") == "BASERA_MALL_EXCLUSIVE"
+    msg = (
+        "Urgent ticket alert! Dune 3 tickets are now live at Basera Mall Chennai. Check notifications and book immediately!"
+        if is_basera else
+        f"Urgent ticket alert! A new 16th show has just been added at {ticket.get('cinema', 'Chennai multiplex')}. Check notifications to book now!"
+    )
+
+    # 1. Twilio Voice Call
+    sid = CONFIG["TWILIO_ACCOUNT_SID"]
+    token = CONFIG["TWILIO_AUTH_TOKEN"]
+    from_num = CONFIG["TWILIO_FROM_NUMBER"]
+    to_num = CONFIG["TO_PHONE_NUMBER"]
+
+    if sid and token and from_num and to_num:
+        print(f"[Call/Twilio] 📞 Initiating phone call to {to_num}...")
+        twiml = f"<Response><Pause length='1'/><Say voice='Polly.Aditi' language='en-IN'>{msg}</Say><Pause length='1'/><Say voice='Polly.Aditi' language='en-IN'>{msg}</Say></Response>"
+        import base64
+        import urllib.parse
+        auth_str = base64.b64encode(f"{sid}:{token}".encode("utf-8")).decode("utf-8")
+        headers = {
+            "Authorization": f"Basic {auth_str}",
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+        data = urllib.parse.urlencode({
+            "To": to_num,
+            "From": from_num,
+            "Twiml": twiml
+        }).encode("utf-8")
+        url = f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Calls.json"
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                print(f"[Call/Twilio] Phone call placed! Status: {resp.status}")
+        except Exception as e:
+            print(f"[Call/Twilio] Phone call failed: {e}")
+
+    # 2. CallMeBot Free Telegram Voice Call
+    tg_user = CONFIG["CALLMEBOT_TELEGRAM_USER"].replace("@", "").strip()
+    if tg_user:
+        print(f"[Call/CallMeBot] 📞 Triggering Telegram voice call to @{tg_user}...")
+        import urllib.parse
+        call_url = f"https://api.callmebot.com/start.php?user=@{tg_user}&text={urllib.parse.quote(msg)}&lang=en-US-Standard-B"
+        fetch_url(call_url)
+        print(f"[Call/CallMeBot] Telegram voice call dispatched!")
+
 def dispatch_alerts(ticket):
     key = f"{ticket['platform']}_{ticket['title']}_{ticket.get('cinema', '')}_{ticket.get('showDate', '')}".lower()
     key = re.sub(r'[^a-z0-9_]', '_', key)
@@ -229,6 +284,7 @@ def dispatch_alerts(ticket):
     send_telegram(ticket)
     send_discord(ticket)
     send_ntfy(ticket)
+    send_voice_call(ticket)
     return True
 
 def poll_district():

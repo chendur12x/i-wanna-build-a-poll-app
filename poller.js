@@ -39,7 +39,16 @@ let config = {
   TELEGRAM_CHAT_ID: (process.env.TELEGRAM_CHAT_ID || '').trim(),
   DISCORD_WEBHOOK_URL: (process.env.DISCORD_WEBHOOK_URL || '').trim(),
   NTFY_TOPIC: (process.env.NTFY_TOPIC || '').trim(),
-  BMS_COOKIE: (process.env.BMS_COOKIE || '').trim()
+  BMS_COOKIE: (process.env.BMS_COOKIE || '').trim(),
+
+  // Phone Call Alerts: Twilio Voice Call (Cellular phone call)
+  TWILIO_ACCOUNT_SID: (process.env.TWILIO_ACCOUNT_SID || '').trim(),
+  TWILIO_AUTH_TOKEN: (process.env.TWILIO_AUTH_TOKEN || '').trim(),
+  TWILIO_FROM_NUMBER: (process.env.TWILIO_FROM_NUMBER || '').trim(),
+  TO_PHONE_NUMBER: (process.env.TO_PHONE_NUMBER || '').trim(),
+
+  // Phone Call Alerts: CallMeBot Telegram Voice Call (100% Free automated voice call)
+  CALLMEBOT_TELEGRAM_USER: (process.env.CALLMEBOT_TELEGRAM_USER || '').trim()
 };
 
 // Merge config.json if present locally
@@ -379,6 +388,96 @@ async function sendNtfyAlert(ticketInfo) {
 }
 
 /**
+ * Perform HTTP/HTTPS POST request with Form URL Encoded body (for Twilio)
+ */
+function postForm(targetUrl, formBody, customHeaders = {}) {
+  return new Promise((resolve, reject) => {
+    let parsed;
+    try {
+      parsed = new URL(targetUrl);
+    } catch (e) {
+      return reject(new Error(`Invalid URL: ${targetUrl}`));
+    }
+
+    const bodyStr = typeof formBody === 'string' ? formBody : new URLSearchParams(formBody).toString();
+    const protocol = parsed.protocol === 'https:' ? https : http;
+
+    const options = {
+      hostname: parsed.hostname,
+      port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+      path: parsed.pathname + parsed.search,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(bodyStr),
+        ...customHeaders
+      },
+      timeout: config.REQUEST_TIMEOUT_MS
+    };
+
+    const req = protocol.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => resolve({ status: res.statusCode, data }));
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error(`Timeout posting form to ${targetUrl}`));
+    });
+
+    req.on('error', reject);
+    req.write(bodyStr);
+    req.end();
+  });
+}
+
+/**
+ * Dispatch Automated Voice Call Alert (Twilio Cellular Call & CallMeBot Telegram Call)
+ */
+async function sendVoiceCallAlert(ticketInfo) {
+  const isBasera = ticketInfo.ruleType === 'BASERA_MALL_EXCLUSIVE';
+  const spokenMessage = isBasera
+    ? `Urgent ticket alert! Dune 3 tickets are now live at Basera Mall Chennai. Check your notifications and book tickets immediately!`
+    : `Urgent ticket alert! A new 16th show has just been added at ${ticketInfo.cinema || 'Chennai multiplex'}. Check your notifications to book now!`;
+
+  // 1. Twilio Cellular Voice Call
+  if (config.TWILIO_ACCOUNT_SID && config.TWILIO_AUTH_TOKEN && config.TWILIO_FROM_NUMBER && config.TO_PHONE_NUMBER) {
+    console.log(`[Call/Twilio] 📞 Dialing phone call to ${config.TO_PHONE_NUMBER}...`);
+    try {
+      const twiml = `<Response><Pause length="1"/><Say voice="Polly.Aditi" language="en-IN">${spokenMessage}</Say><Pause length="1"/><Say voice="Polly.Aditi" language="en-IN">${spokenMessage}</Say></Response>`;
+      const authHeader = 'Basic ' + Buffer.from(`${config.TWILIO_ACCOUNT_SID}:${config.TWILIO_AUTH_TOKEN}`).toString('base64');
+      const params = new URLSearchParams({
+        To: config.TO_PHONE_NUMBER,
+        From: config.TWILIO_FROM_NUMBER,
+        Twiml: twiml
+      });
+
+      const url = `https://api.twilio.com/2010-04-01/Accounts/${config.TWILIO_ACCOUNT_SID}/Calls.json`;
+      const res = await postForm(url, params.toString(), {
+        'Authorization': authHeader
+      });
+      console.log(`[Call/Twilio] Phone call initiated successfully! HTTP ${res.status}`);
+    } catch (err) {
+      console.error(`[Call/Twilio] Failed to initiate voice call: ${err.message}`);
+    }
+  }
+
+  // 2. CallMeBot Telegram Automated Voice Call (Free)
+  if (config.CALLMEBOT_TELEGRAM_USER) {
+    const rawUser = config.CALLMEBOT_TELEGRAM_USER.replace(/^@/, '').trim();
+    console.log(`[Call/CallMeBot] 📞 Triggering Telegram voice call to @${rawUser}...`);
+    try {
+      const callUrl = `https://api.callmebot.com/start.php?user=@${rawUser}&text=${encodeURIComponent(spokenMessage)}&lang=en-US-Standard-B`;
+      const res = await fetchUrl(callUrl);
+      console.log(`[Call/CallMeBot] Telegram voice call triggered! HTTP ${res.status}`);
+    } catch (err) {
+      console.error(`[Call/CallMeBot] Voice call error: ${err.message}`);
+    }
+  }
+}
+
+/**
  * Dispatch alert across all channels with persistent deduplication
  */
 async function notifyAll(ticketInfo) {
@@ -411,7 +510,8 @@ async function notifyAll(ticketInfo) {
   await Promise.allSettled([
     sendTelegramAlert(ticketInfo),
     sendDiscordAlert(ticketInfo),
-    sendNtfyAlert(ticketInfo)
+    sendNtfyAlert(ticketInfo),
+    sendVoiceCallAlert(ticketInfo)
   ]);
 
   return true;
