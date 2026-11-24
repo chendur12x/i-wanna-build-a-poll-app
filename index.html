@@ -1201,12 +1201,12 @@ DISCORD_WEBHOOK_URL="${cfg.DISCORD_WEBHOOK_URL}"`;
         const res = await fetch(`https://ntfy.sh/${cleanTopic}`, {
           method: 'POST',
           headers: {
-            'Title': '🚨 DUNE 3 CHENNAI IMAX TEST!',
+            'Title': 'DUNE 3 CHENNAI IMAX TEST',
             'Priority': 'urgent',
-            'Tags': 'warning,ticket,fire',
+            'Tags': 'rotating_light,ticket,fire',
             'Click': 'https://in.bookmyshow.com/explore/movies-chennai'
           },
-          body: 'Arrakis Radar Chennai IMAX test notification! When tickets drop at Palazzo or Luxe, your phone will ring instantly.'
+          body: 'Arrakis Radar test notification! When tickets drop at Basera Mall or 16th shows at other theatres, your phone will ring instantly.'
         });
 
         if (res.ok) {

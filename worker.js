@@ -193,15 +193,16 @@ async function sendAlert(env, ticket) {
     });
   }
 
-  // ntfy.sh
+  // ntfy.sh (headers strictly ASCII safe)
   if (env.NTFY_TOPIC) {
-    const topic = env.NTFY_TOPIC.replace('https://ntfy.sh/', '');
+    const topic = env.NTFY_TOPIC.replace('https://ntfy.sh/', '').trim();
+    const cleanTitle = (ticket.badge || 'TICKET ALERT').replace(/[^\x00-\x7F]/g, '').trim();
     await fetch(`https://ntfy.sh/${topic}`, {
       method: 'POST',
       headers: {
-        'Title': ticket.badge,
+        'Title': cleanTitle,
         'Priority': 'urgent',
-        'Tags': 'warning,ticket,fire',
+        'Tags': 'rotating_light,ticket,fire',
         'Click': ticket.url
       },
       body: `${ticket.title} at ${ticket.cinema} (${ticket.showDate}) is LIVE!`

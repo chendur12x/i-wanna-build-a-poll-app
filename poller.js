@@ -356,18 +356,19 @@ async function sendNtfyAlert(ticketInfo) {
   if (!topic) return;
 
   const isBasera = ticketInfo.ruleType === 'BASERA_MALL_EXCLUSIVE';
-  const alertTitle = isBasera
-    ? '🚨 BASERA MALL DUNE 3 TICKETS LIVE!'
-    : `🚨 16TH SHOW ADDED: ${ticketInfo.cinema}!`;
+  const rawTitle = isBasera
+    ? 'BASERA MALL DUNE 3 TICKETS LIVE!'
+    : `16TH SHOW ADDED: ${ticketInfo.cinema || 'CHENNAI'}!`;
+  const cleanTitle = rawTitle.replace(/[^\x00-\x7F]/g, '').trim();
 
   try {
     const res = await postJson(
       `https://ntfy.sh/${topic}`,
       `${ticketInfo.badge}: ${ticketInfo.title} (${ticketInfo.format || 'IMAX'}). Tap to book instantly!`,
       {
-        'Title': alertTitle,
+        'Title': cleanTitle,
         'Priority': 'urgent',
-        'Tags': isBasera ? 'warning,star,ticket,fire' : 'calendar,ticket,movie_camera',
+        'Tags': isBasera ? 'rotating_light,star,ticket,fire' : 'calendar,ticket,movie_camera',
         'Click': ticketInfo.url
       }
     );

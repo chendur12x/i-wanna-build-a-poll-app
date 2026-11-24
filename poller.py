@@ -202,11 +202,12 @@ def send_ntfy(ticket):
     if not topic:
         return
     is_basera = ticket.get("ruleType") == "BASERA_MALL_EXCLUSIVE"
-    title = "🚨 BASERA MALL DUNE 3 TICKETS LIVE!" if is_basera else f"🚨 16TH SHOW ADDED: {ticket.get('cinema')}!"
+    raw_title = "BASERA MALL DUNE 3 TICKETS LIVE!" if is_basera else f"16TH SHOW ADDED: {ticket.get('cinema', 'CHENNAI')}!"
+    clean_title = re.sub(r'[^\x00-\x7F]', '', raw_title).strip()
     headers = {
-        "Title": title,
+        "Title": clean_title,
         "Priority": "urgent",
-        "Tags": "warning,star,ticket,fire" if is_basera else "calendar,ticket,movie_camera",
+        "Tags": "rotating_light,star,ticket,fire" if is_basera else "calendar,ticket,movie_camera",
         "Click": ticket["url"]
     }
     body = f"{ticket.get('badge')}: {ticket['title']} ({ticket.get('format', 'IMAX')}). Tap to book!"
