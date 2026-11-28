@@ -3,23 +3,17 @@
 
 ---
 
-## 🎯 Active Surveillance Mission Rules
+## 🎯 Active Surveillance Mission Rule
 
-The surveillance logic has been narrowed down to the following strict criteria:
+Surveillance is strictly locked onto **one single target**:
 
-1. 🏛️ **Basera Mall Alone (Unconditional Priority)**:
-   - Targets **PVR INOX Basera Mall** (East Coast Road, Injambakkam — ECR Hub) alone.
-   - Any showtime, date, or format at Basera Mall triggers an immediate high-priority alert.
-2. 📅 **Other Theatres (16th Shows Alone)**:
-   - For all other Chennai multiplexes (e.g. Palazzo Vadapalani, Luxe Phoenix Marketcity, etc.), surveillance is strictly narrowed down to **newly added shows on the 16th alone**.
-   - Any show on dates other than the 16th is filtered out.
-3. 💺 **Desired Rows A–G Radar (Palazzo & Luxe 16th Alone)**:
+1. 💺 **Desired Rows A–G Radar (Palazzo & Luxe 16th Alone — Checked Every Sweep)**:
    - On BookMyShow & District for **PVR INOX Palazzo IMAX (Screen 10)** and **PVR INOX Luxe IMAX (Screen 11)**, the screen is at the bottom of the seating chart, making **Rows A through G** the coveted **Elite Tier (₹508.34)** top/rear rows (farthest from screen with optimal IMAX sightlines and acoustics).
-   - Surveillance actively inspects seat layouts and availability specifically for unblocked seats in **Rows A, B, C, D, E, F, G** for **16th shows**.
-   - Detects late unblocking of held/VIP quota seats and instantly triggers an `ULTRA_CRITICAL` multi-channel alert and automated phone call to `@chendur12`.
-4. 🛡️ **Mission-Critical Deduplication**:
+   - Surveillance actively inspects seat availability specifically for **Rows A, B, C, D, E, F, G** on **16th shows** unconditionally on **every single sweep** (no close-to-showtime restriction).
+   - Instantly triggers an `ULTRA_CRITICAL` multi-channel alert and automated phone call to `@chendur12`.
+2. 🛡️ **Mission-Critical Deduplication**:
    - Persists detected show hashes in `.cache/seen_shows.json` across GitHub Actions executions using `actions/cache@v4`.
-   - Prevents duplicate alert spam while guaranteeing zero missed new show additions.
+   - Prevents duplicate alert spam while guaranteeing zero missed seat openings.
 
 ---
 
@@ -27,10 +21,10 @@ The surveillance logic has been narrowed down to the following strict criteria:
 
 ### ☁️ GitHub Actions (Active Production Deployment)
 
-The poller is deployed as a GitHub Actions cron workflow at:
+The poller is deployed as a continuous self-chaining 5-minute loop on GitHub Actions:
 [`./.github/workflows/dune-imax-poller.yml`](.github/workflows/dune-imax-poller.yml)
 
-- **Execution Cadence**: Runs automatically every 5 minutes (`cron: '*/5 * * * *'`).
+- **Execution Cadence**: Polls every **exact 5 minutes** (`300s`) inside a 300-minute runner loop (`--loop-minutes=300`) and automatically chains the next 5-hour cycle via `workflow_dispatch` (with `cron: '*/5 * * * *'` as watchdog backup) so it never gets delayed by GitHub's cron queue.
 - **Free & Serverless**: 100% free runner minutes on GitHub Actions.
 - **Manual Trigger**: Can be executed on-demand from the **Actions** tab with custom parameters or test alerts via `workflow_dispatch`.
 

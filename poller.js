@@ -108,21 +108,25 @@ const notifiedSet = loadPersistedState();
  * Rules:
  * 1. Ultra-Priority: Last 5 Rows Radar at Palazzo & Luxe (16th Shows) - detects held/VIP seats opening close to showtime
  * 2. Basera Mall alone: Any show at Basera Mall is eligible (all dates).
- * 3. Other theatres 16th alone: Shows at other theatres are ONLY eligible if the show date is the 16th.
- * 4. Shows on any other date at other theatres are filtered out.
+/**
+ * Strict Eligibility Filter:
+ * ONLY monitors PVR INOX Palazzo & Luxe IMAX on the 16th for Desired Rows A-G (Elite Tier).
+ * Check happens EVERY TIME without any close-to-showtime restriction.
  */
 function evaluateShowEligibility(cinemaName, showDate, venueDetails = '', extraContext = {}) {
   const cinemaText = `${cinemaName || ''} ${venueDetails || ''}`.toLowerCase();
   const dateStr = String(showDate || '').trim().toLowerCase();
 
-  // Rule 1: Ultra-Priority - Desired Rows A-G (Elite Tier) at Palazzo or Luxe for 16th shows
   const isPalazzoOrLuxe = cinemaText.includes('palazzo') || cinemaText.includes('luxe') || cinemaText.includes('palz') || cinemaText.includes('inlu');
   const is16th = /(?:^|\D)16(?:th)?(?:\D|$)|-16\b|16-|\b16\b/i.test(dateStr);
 
-  const isEliteOrRowsAG = extraContext.isRowsAGOpen || extraContext.isEliteTierOpen ||
-    /(?:rows?[-_\s]*[a-g]\b|elite|₹?508(?:\.34)?|prime|top\s*rows?)/i.test(`${venueDetails || ''} ${extraContext.rawSeats || ''} ${extraContext.status || ''}`);
+  const isRowsAGOpen = Boolean(
+    extraContext.isRowsAGOpen ||
+    extraContext.isEliteTierOpen ||
+    /(?:rows?[-_\s]*[a-g]\b|elite|₹?508(?:\.34)?)/i.test(`${venueDetails || ''} ${extraContext.rawSeats || ''} ${extraContext.status || ''}`)
+  );
 
-  if (isPalazzoOrLuxe && is16th && (isEliteOrRowsAG || extraContext.isLastRowsOpen || extraContext.isLateRelease || extraContext.isCloseToShowtime)) {
+  if (isPalazzoOrLuxe && is16th && isRowsAGOpen) {
     return {
       eligible: true,
       ruleType: 'ROWS_A_TO_G_RELEASE',
@@ -131,38 +135,10 @@ function evaluateShowEligibility(cinemaName, showDate, venueDetails = '', extraC
       cinema: cinemaName,
       date: showDate || '16th',
       rows: extraContext.rows || 'Desired Rows A–G (Elite Tier ₹508.34)',
-      reason: 'Detected seats in desired Rows A-G (Elite tier) opening close to showtime on 16th'
+      reason: 'Detected open seats in desired Rows A-G (Elite tier) on 16th'
     };
   }
 
-  // Rule 2: Basera Mall (PVR INOX Basera / Basera Mall / Basera ECR) - All Dates
-  const isBasera = cinemaText.includes(config.PRIMARY_CINEMA) || cinemaText.includes('basera');
-  if (isBasera) {
-    return {
-      eligible: true,
-      ruleType: 'BASERA_MALL_EXCLUSIVE',
-      priority: 'HIGH',
-      badge: '🏛️ BASERA MALL (ALL DATES)',
-      cinema: cinemaName || 'PVR INOX Basera Mall (ECR)',
-      date: showDate || 'All Open Dates',
-      reason: 'Matched Basera Mall primary surveillance'
-    };
-  }
-
-  // Rule 3: Other Theatres - ONLY 16th show date
-  if (is16th) {
-    return {
-      eligible: true,
-      ruleType: 'OTHER_THEATRE_16TH',
-      priority: 'CRITICAL',
-      badge: `📅 16TH SHOW ADDED (${cinemaName || 'Other Theatre'})`,
-      cinema: cinemaName || 'Other Chennai Multiplex',
-      date: showDate || '16th',
-      reason: `Matched 16th show date at other theatre (${cinemaName || 'Venue'})`
-    };
-  }
-
-  // Rule 4: Excluded
   return {
     eligible: false,
     ruleType: 'FILTERED_OUT',
@@ -170,7 +146,7 @@ function evaluateShowEligibility(cinemaName, showDate, venueDetails = '', extraC
     badge: 'IGNORED',
     cinema: cinemaName,
     date: showDate,
-    reason: `Filtered: Not Basera Mall and show date '${showDate || 'unknown'}' is not the 16th`
+    reason: `Filtered: Only Palazzo & Luxe on 16th for Rows A-G are monitored`
   };
 }
 
@@ -454,8 +430,8 @@ async function sendNtfyHeartbeat(matchesCount = 0) {
 
   const cleanTitle = `Arrakis Radar: Heartbeat OK (${istTime} IST)`.replace(/[^\x00-\x7F]/g, '').trim();
   const body = matchesCount > 0
-    ? `[${runner}${runId}] Active sweep completed at ${istTime} IST. Matches detected: ${matchesCount}. Radar active.`
-    : `[${runner}${runId}] 5-min sweep complete at ${istTime} IST. Standing by. Monitored: Basera Mall (all dates), 16th shows, Rows A-G (Palazzo & Luxe).`;
+    ? `[${runner}${runId}] Active sweep at ${istTime} IST. Rows A-G matches detected: ${matchesCount}.`
+    : `[${runner}${runId}] 5-min sweep at ${istTime} IST. Monitoring ONLY Rows A-G (Palazzo & Luxe, 16th). Standing by.`;
 
   try {
     const res = await postJson(
@@ -616,12 +592,64 @@ async function notifyAll(ticketInfo) {
 
 /**
  * Poll District (by Zomato)
- * Extracts structured Next.js data to accurately evaluate cinema and show date
+ * Directly queries live District seat-layout API for Palazzo & Luxe on 2026-12-16
+ * and checks every single seat in Rows A, B, C, D, E, F, G (SeatStatus === '0').
  */
+async function getDistrictGuestToken(deviceId) {
+  try {
+    const res = await postJson('https://www.district.in/gw/auth/skip_login', {}, {
+      'x-device-id': deviceId,
+      'Origin': 'https://www.district.in',
+      'Referer': 'https://www.district.in/'
+    });
+    const parsed = JSON.parse(res.data || '{}');
+    return parsed.token?.guest_token || '';
+  } catch (err) {
+    console.warn(`[District] Guest token warning: ${err.message}`);
+    return '';
+  }
+}
+
+async function checkDistrictSessionRowsAG(cinemaId, sessionId, guestToken, deviceId) {
+  try {
+    const res = await postJson('https://www.district.in/gw/consumer/movies/v1/select-seat', {
+      cinemaId: Number(cinemaId),
+      sessionId: String(sessionId)
+    }, {
+      'x-guest-token': guestToken,
+      'x-access-token': guestToken,
+      'x-device-id': deviceId,
+      'x-app-type': 'ed_web',
+      'Origin': 'https://www.district.in',
+      'Referer': 'https://www.district.in/'
+    });
+    if (res.status !== 200) return [];
+    const data = JSON.parse(res.data || '{}');
+    const areas = data.seatLayout?.colAreas?.objArea || [];
+    const desiredRows = new Set(['A', 'B', 'C', 'D', 'E', 'F', 'G']);
+    const openSeats = [];
+    for (const area of areas) {
+      for (const row of area.objRow || []) {
+        const rowId = String(row.PhyRowId || '').trim().toUpperCase();
+        if (!desiredRows.has(rowId)) continue;
+        for (const seat of row.objSeat || []) {
+          if (String(seat.SeatStatus) === '0') {
+            openSeats.push(`${rowId}${seat.displaySeatNumber || seat.seatNumber}`);
+          }
+        }
+      }
+    }
+    return openSeats;
+  } catch (err) {
+    console.warn(`[District] Seat map check error (sid=${sessionId}): ${err.message}`);
+    return [];
+  }
+}
+
 async function pollDistrict() {
   const logPrefix = '[District]';
   const start = Date.now();
-  console.log(`${logPrefix} Scanning district.in catalog for "${config.MOVIE_KEYWORD}" (City: ${config.CITY})...`);
+  console.log(`${logPrefix} Scanning district.in (${config.CITY}) for "${config.MOVIE_KEYWORD}" — Palazzo & Luxe 16th Rows A–G...`);
 
   try {
     const exploreUrls = [
@@ -642,25 +670,28 @@ async function pollDistrict() {
       }
     }
 
-    if (!html) {
-      console.warn(`${logPrefix} Unable to retrieve movie listings from District.`);
-      return [];
-    }
-
-    // Match all movie paths
-    const movieMatches = html.match(/\/movies\/([a-zA-Z0-9\-]+(?:-MV[0-9]+)?)/g) || [];
+    const movieMatches = html ? (html.match(/\/movies\/([a-zA-Z0-9\-]+(?:-MV[0-9]+)?)/g) || []) : [];
     const uniqueSlugs = [...new Set(movieMatches.map(m => m.replace('/movies/', '')))];
 
-    const matchedSlugs = uniqueSlugs.filter(slug => {
-      return slug.toLowerCase().includes(config.MOVIE_KEYWORD);
+    // Strictly filter for target movie AND target city (chennai)
+    let matchedSlugs = uniqueSlugs.filter(slug => {
+      const lower = slug.toLowerCase();
+      return lower.includes(config.MOVIE_KEYWORD) && lower.includes(`-in-${config.CITY}`);
     });
 
-    console.log(`${logPrefix} Catalog scanned: ${uniqueSlugs.length} titles | Matched "${config.MOVIE_KEYWORD}": ${matchedSlugs.length} (${Date.now() - start}ms)`);
+    // Guaranteed direct fallback for Dune 3 Chennai if catalog filter misses it
+    if (matchedSlugs.length === 0 && config.MOVIE_KEYWORD === 'dune' && config.CITY === 'chennai') {
+      matchedSlugs = ['dune-part-three-movie-tickets-in-chennai-MV207332'];
+    }
+
+    console.log(`${logPrefix} Catalog scanned: ${uniqueSlugs.length} titles | Matched "${config.MOVIE_KEYWORD}" in ${config.CITY}: ${matchedSlugs.length} (${Date.now() - start}ms)`);
 
     const discoveries = [];
+    const deviceId = 'arrakis-radar-' + Math.random().toString(36).slice(2, 10);
+    let guestToken = '';
 
     for (const slug of matchedSlugs) {
-      const movieUrl = `https://www.district.in/movies/${slug}`;
+      const movieUrl = `https://www.district.in/movies/${slug}?fromdate=2026-12-16`;
       try {
         const moviePage = await fetchUrl(movieUrl);
         if (moviePage.status !== 200) continue;
@@ -668,116 +699,87 @@ async function pollDistrict() {
         const pageHtml = moviePage.data;
         const movieTitle = slug.replace(/-movie-tickets.*$/, '').replace(/-/g, ' ').toUpperCase();
 
-        // 1. Try to extract Next.js __NEXT_DATA__ for deep structure
-        const nextDataMatch = pageHtml.match(/<script id="__NEXT_DATA__" type="application\/json">(.+?)<\/script>/s);
+        const idx = pageHtml.indexOf('__NEXT_DATA__');
+        if (idx === -1) continue;
+        const sIdx = pageHtml.indexOf('>', idx) + 1;
+        const eIdx = pageHtml.indexOf('</script>', sIdx);
         let parsedNext = null;
-        if (nextDataMatch) {
-          try {
-            parsedNext = JSON.parse(nextDataMatch[1]);
-          } catch (_) {}
+        try {
+          parsedNext = JSON.parse(pageHtml.slice(sIdx, eIdx));
+        } catch (_) { continue; }
+
+        const moviesState = parsedNext?.props?.pageProps?.initialState?.movies;
+        const sessObj = Object.values(moviesState?.movieSessions || {})[0];
+        if (!sessObj || sessObj.searchDate !== '2026-12-16') {
+          console.log(`${logPrefix} No 2026-12-16 sessions listed yet for ${movieTitle}.`);
+          continue;
         }
 
-        const isBookingOpen = /book\s*tickets?|available|filling\s*fast/i.test(pageHtml);
-        const hasImax = /IMAX/i.test(pageHtml) || /IMAX/i.test(slug);
+        const cinemas = [
+          ...(sessObj.pageData?.nearbyCinemas || []),
+          ...(sessObj.pageData?.farCinemas || [])
+        ];
 
-        // Check structured cinemas & dates if present
-        let matchedShows = [];
+        // ONLY Palazzo & Luxe (Phoenix Market City Velachery)
+        const targetCinemas = cinemas.filter(c => {
+          const name = c.cinemaInfo?.name || '';
+          return /palazzo|nexus vijaya|luxe|phoenix market city|jazz cinemas/i.test(name);
+        });
 
-        if (parsedNext && parsedNext.props && parsedNext.props.pageProps) {
-          const moviesState = parsedNext.props.pageProps.initialState?.movies;
-          const showDates = moviesState?.filtersData?.filters?.showDates || [];
-          const cinemas = moviesState?.filtersData?.filters?.cinemas || [];
+        console.log(`${logPrefix} Found ${targetCinemas.length} target cinemas (Palazzo/Luxe) on 2026-12-16.`);
 
-          // Case A: Structured cinemas and showDates present
-          if (cinemas.length > 0 || showDates.length > 0) {
-            for (const cinema of cinemas) {
-              const cName = cinema.title || cinema.name || cinema.cinemaName || '';
-              for (const sDate of showDates) {
-                const evalResult = evaluateShowEligibility(cName, sDate);
-                if (evalResult.eligible) {
-                  matchedShows.push({
-                    cinema: evalResult.cinema,
-                    showDate: sDate,
-                    ruleType: evalResult.ruleType,
-                    badge: evalResult.badge,
-                    priority: evalResult.priority
-                  });
-                }
-              }
+        for (const cinema of targetCinemas) {
+          const cName = cinema.cinemaInfo?.name || 'Palazzo / Luxe IMAX';
+          const sessions = cinema.sessions || [];
+
+          for (const session of sessions) {
+            const totalAvail = (session.areas || []).reduce((sum, a) => sum + (a.sAvail || 0), 0);
+            const showTimeStr = (session.showTime || '').split('T')[1] || session.showTime || '';
+
+            if (totalAvail === 0) {
+              console.log(`${logPrefix} ${cName} (${showTimeStr}): 0 seats available. Skipping seat-map call.`);
+              continue;
             }
-          }
-        }
 
-        // Case B: Fallback regex inspection on page content
-        if (matchedShows.length === 0) {
-          // Check if page specifically mentions Basera
-          if (/basera/i.test(pageHtml)) {
-            const evalResult = evaluateShowEligibility('PVR INOX Basera Mall (ECR)', 'All Open Dates');
-            if (evalResult.eligible) {
-              matchedShows.push({
-                cinema: 'PVR INOX Basera Mall (ECR)',
-                showDate: 'Live on District',
-                ruleType: evalResult.ruleType,
-                badge: evalResult.badge,
-                priority: evalResult.priority
+            if (!guestToken) {
+              guestToken = await getDistrictGuestToken(deviceId);
+            }
+
+            const openSeatsAG = guestToken
+              ? await checkDistrictSessionRowsAG(session.cid, session.sid, guestToken, deviceId)
+              : [];
+
+            console.log(`${logPrefix} ${cName} (${showTimeStr}): Total avail=${totalAvail} | Rows A–G open=${openSeatsAG.length} [${openSeatsAG.join(', ') || 'none'}]`);
+
+            if (openSeatsAG.length > 0) {
+              const evalRes = evaluateShowEligibility(cName, '2026-12-16', `Rows ${openSeatsAG.join(', ')}`, {
+                isRowsAGOpen: true,
+                rows: `Rows A–G Open: ${openSeatsAG.join(', ')}`
               });
-            }
-          }
 
-          // Check if page mentions 16th show date
-          const dateMatches = pageHtml.match(/(?:16th\s+[A-Za-z]+|[A-Za-z]+\s+16th|2026-12-16|2026-[0-9]{2}-16)/gi);
-          if (dateMatches) {
-            const uniqueDates = [...new Set(dateMatches)];
-            for (const matchedDate of uniqueDates) {
-              const evalResult = evaluateShowEligibility('Chennai Theatres (16th Show)', matchedDate);
-              if (evalResult.eligible) {
-                matchedShows.push({
-                  cinema: 'Chennai Multiplex',
-                  showDate: matchedDate,
-                  ruleType: evalResult.ruleType,
-                  badge: evalResult.badge,
-                  priority: evalResult.priority
-                });
+              if (evalRes.eligible) {
+                const discovery = {
+                  title: movieTitle,
+                  platform: 'District (Zomato)',
+                  url: movieUrl,
+                  city: config.CITY,
+                  cinema: cName,
+                  showDate: '2026-12-16',
+                  showTime: showTimeStr,
+                  rows: evalRes.rows,
+                  format: 'IMAX Laser (1.90:1)',
+                  status: `ROWS A–G OPEN (${openSeatsAG.length} SEATS): ${openSeatsAG.join(', ')}`,
+                  ruleType: evalRes.ruleType,
+                  badge: evalRes.badge,
+                  priority: evalRes.priority,
+                  timestamp: new Date().toISOString()
+                };
+                discoveries.push(discovery);
+                await notifyAll(discovery);
               }
             }
           }
-
-          // Case C: If booking is officially open and no specific breakdown was found
-          // Evaluate general listing
-          if (isBookingOpen && matchedShows.length === 0) {
-            // Check if user wants Basera alone or 16th
-            // If Basera is in cinema filter, check if booking is open
-            const evalBasera = evaluateShowEligibility('Basera Mall', 'Live Booking');
-            matchedShows.push({
-              cinema: 'PVR INOX Basera Mall (ECR)',
-              showDate: 'Live Now',
-              ruleType: evalBasera.ruleType,
-              badge: evalBasera.badge,
-              priority: evalBasera.priority
-            });
-          }
         }
-
-        // Dispatch notifications for each eligible show
-        for (const show of matchedShows) {
-          const discovery = {
-            title: movieTitle,
-            platform: 'District (Zomato)',
-            url: movieUrl,
-            city: config.CITY,
-            cinema: show.cinema,
-            showDate: show.showDate,
-            format: hasImax ? 'IMAX Laser (1.90:1)' : 'Standard / 3D',
-            status: isBookingOpen ? 'BOOKINGS LIVE NOW!' : 'Showtimes Listed (Active)',
-            ruleType: show.ruleType,
-            badge: show.badge,
-            priority: show.priority,
-            timestamp: new Date().toISOString()
-          };
-          discoveries.push(discovery);
-          await notifyAll(discovery);
-        }
-
       } catch (err) {
         console.error(`${logPrefix} Error inspecting ${slug}:`, err.message);
       }
@@ -792,12 +794,13 @@ async function pollDistrict() {
 
 /**
  * Poll BookMyShow
- * Dedicated monitoring for Basera Mall and 16th show dates
+ * ONLY monitors Palazzo & Luxe IMAX on the 16th for Desired Rows A-G (Elite Tier).
+ * Runs unconditionally every sweep (no close-to-showtime restriction).
  */
 async function pollBookMyShow() {
   const logPrefix = '[BookMyShow]';
   const start = Date.now();
-  console.log(`${logPrefix} Checking BMS explore for "${config.MOVIE_KEYWORD}" & Basera Mall...`);
+  console.log(`${logPrefix} Checking Palazzo & Luxe BMS pages for "${config.MOVIE_KEYWORD}" (16th • Rows A-G)...`);
 
   const headers = {
     'Referer': 'https://in.bookmyshow.com/',
@@ -809,29 +812,14 @@ async function pollBookMyShow() {
 
   const targets = [
     {
-      name: 'BMS Explore Movies Chennai',
-      url: `https://in.bookmyshow.com/explore/movies-${config.CITY}`,
-      isCinemaDirect: false
-    },
-    {
-      name: 'PVR INOX Basera ECR Chennai Cinema Page',
-      url: `https://in.bookmyshow.com/cinemas/che/pvr-inox-basera-ecr-chennai/buytickets/BSER/`,
-      isCinemaDirect: true,
-      cinemaName: 'PVR INOX Basera Mall (ECR)'
-    },
-    {
       name: 'PVR INOX Palazzo IMAX Vadapalani (16th & Rows A-G Radar)',
       url: `https://in.bookmyshow.com/cinemas/che/pvr-palazzo-the-nexus-vijaya-mall-vadapalani-chennai/buytickets/PALZ/`,
-      isCinemaDirect: true,
-      cinemaName: 'PVR INOX Palazzo IMAX (Nexus Vijaya)',
-      watch16thRowsAG: true
+      cinemaName: 'PVR INOX Palazzo IMAX (Nexus Vijaya)'
     },
     {
       name: 'PVR INOX Luxe IMAX Velachery (16th & Rows A-G Radar)',
       url: `https://in.bookmyshow.com/cinemas/che/pvr-inox-luxe-phoenix-marketcity-velachery-chennai/buytickets/INLU/`,
-      isCinemaDirect: true,
-      cinemaName: 'PVR INOX Luxe IMAX (Phoenix Marketcity)',
-      watch16thRowsAG: true
+      cinemaName: 'PVR INOX Luxe IMAX (Phoenix Marketcity)'
     }
   ];
 
@@ -843,141 +831,42 @@ async function pollBookMyShow() {
       const duration = Date.now() - start;
 
       if (res.status === 403) {
-        console.log(`${logPrefix} Cloudflare bot protection active on ${target.name} (${duration}ms). District primary layer active.`);
+        console.log(`${logPrefix} Cloudflare bot protection active on ${target.name} (${duration}ms). District layer active.`);
         continue;
       }
 
       if (res.status === 200 && res.data.length > 500) {
         const html = res.data;
+        const movieRegex = new RegExp(config.MOVIE_KEYWORD, 'i');
+        const hasMovie = movieRegex.test(html);
+        const has16th = /(?:16th|-16\b|16-|\b16\b)/i.test(html);
 
-        // If directly checking cinema pages (Basera, Palazzo, Luxe)
-        if (target.isCinemaDirect) {
-          const movieRegex = new RegExp(config.MOVIE_KEYWORD, 'i');
-          const hasMovie = movieRegex.test(html);
+        if (hasMovie && has16th) {
+          const hasRowsAG = /(?:rows?[-_\s]*[a-g]\b|elite|₹?508(?:\.34)?)/i.test(html);
+          const evalRes = evaluateShowEligibility(target.cinemaName, '16th Show', 'Palazzo & Luxe 16th Rows A-G Radar', {
+            isRowsAGOpen: hasRowsAG,
+            isEliteTierOpen: hasRowsAG,
+            rows: 'Desired Rows A–G (Elite Tier ₹508.34)'
+          });
 
-          // For Palazzo and Luxe 16th & Rows A-G Radar:
-          if (target.watch16thRowsAG || target.watch16thLastRows) {
-            const has16th = /(?:16th|-16\b|16-|\b16\b)/i.test(html);
-            if (hasMovie || has16th) {
-              const hasRowsAG = /(?:rows?[-_\s]*[a-g]\b|elite|₹?508(?:\.34)?|prime|top\s*rows?|available|filling\s*fast)/i.test(html);
-              const isCloseTime = /today|tomorrow|mins|hrs|pm|am/i.test(html);
-
-              const evalRes = evaluateShowEligibility(target.cinemaName, '16th Show', 'Palazzo & Luxe 16th Radar', {
-                isRowsAGOpen: hasRowsAG,
-                isEliteTierOpen: hasRowsAG,
-                isLateRelease: true,
-                isCloseToShowtime: isCloseTime,
-                rows: 'Desired Rows A–G (Elite Tier ₹508.34)'
-              });
-
-              if (evalRes.eligible) {
-                const discovery = {
-                  title: config.MOVIE_KEYWORD.toUpperCase(),
-                  platform: 'BookMyShow',
-                  url: target.url,
-                  city: config.CITY,
-                  cinema: target.cinemaName,
-                  showDate: '16th Show',
-                  rows: evalRes.rows,
-                  format: 'IMAX Laser (1.90:1)',
-                  status: hasRowsAG ? 'DESIRED ROWS A–G TICKETS OPENED ONLINE!' : '16TH SHOW AVAILABLE AT PALAZZO/LUXE',
-                  ruleType: evalRes.ruleType,
-                  badge: evalRes.badge,
-                  priority: evalRes.priority,
-                  timestamp: new Date().toISOString()
-                };
-                discoveries.push(discovery);
-                await notifyAll(discovery);
-              }
-            }
-            continue;
-          }
-
-          // For Basera Mall
-          if (hasMovie) {
-            console.log(`${logPrefix} 🚨 TARGET MOVIE DETECTED DIRECTLY AT BASERA MALL BMS PAGE!`);
-            const evalResult = evaluateShowEligibility('PVR INOX Basera Mall (ECR)', 'Live Booking');
+          if (evalRes.eligible) {
             const discovery = {
               title: config.MOVIE_KEYWORD.toUpperCase(),
               platform: 'BookMyShow',
               url: target.url,
               city: config.CITY,
-              cinema: 'PVR INOX Basera Mall (ECR)',
-              showDate: 'Live Now',
-              format: 'IMAX Laser / 4K',
-              status: 'SHOWTIMES LIVE AT BASERA MALL BMS!',
-              ruleType: evalResult.ruleType,
-              badge: evalResult.badge,
-              priority: evalResult.priority,
+              cinema: target.cinemaName,
+              showDate: '16th Show',
+              rows: evalRes.rows,
+              format: 'IMAX Laser (1.90:1)',
+              status: 'DESIRED ROWS A–G TICKETS OPENED ONLINE!',
+              ruleType: evalRes.ruleType,
+              badge: evalRes.badge,
+              priority: evalRes.priority,
               timestamp: new Date().toISOString()
             };
             discoveries.push(discovery);
             await notifyAll(discovery);
-          }
-          continue;
-        }
-
-        // On explore page: find movie events
-        const movieRegex = new RegExp(`/movies/([^/]*${config.MOVIE_KEYWORD}[^/]*)/(ET[0-9]+)`, 'gi');
-        const matches = [...html.matchAll(movieRegex)];
-
-        for (const m of matches) {
-          const slug = m[1];
-          const eventCode = m[2];
-          const title = slug.replace(/-/g, ' ').toUpperCase();
-          const url = `https://in.bookmyshow.com/${config.CITY}/movies/${slug}/${eventCode}`;
-
-          // Fetch showtimes page for this movie if accessible
-          try {
-            const showPage = await fetchUrl(url, headers);
-            if (showPage.status === 200) {
-              const showHtml = showPage.data;
-              
-              // 1. Check for Basera Mall
-              if (/basera/i.test(showHtml)) {
-                const evalBasera = evaluateShowEligibility('PVR INOX Basera Mall (ECR)', 'All Open Dates');
-                const discBasera = {
-                  title,
-                  platform: 'BookMyShow',
-                  url,
-                  city: config.CITY,
-                  cinema: 'PVR INOX Basera Mall (ECR)',
-                  showDate: 'Live on BMS',
-                  format: 'IMAX Laser',
-                  status: 'BOOKINGS LIVE AT BASERA MALL!',
-                  ruleType: evalBasera.ruleType,
-                  badge: evalBasera.badge,
-                  priority: evalBasera.priority,
-                  timestamp: new Date().toISOString()
-                };
-                discoveries.push(discBasera);
-                await notifyAll(discBasera);
-              }
-
-              // 2. Check for other theatres 16th shows alone
-              const date16Matches = showHtml.match(/(?:16th\s+[A-Za-z]+|[A-Za-z]+\s+16th|2026-12-16|data-date="[^"]*16[^"]*")/gi);
-              if (date16Matches) {
-                const eval16 = evaluateShowEligibility('Chennai Multiplex', '16th Show');
-                const disc16 = {
-                  title,
-                  platform: 'BookMyShow',
-                  url,
-                  city: config.CITY,
-                  cinema: 'Chennai Theatres',
-                  showDate: '16th Show',
-                  format: 'IMAX Laser / 2D',
-                  status: '16TH SHOW LIVE ON BMS!',
-                  ruleType: eval16.ruleType,
-                  badge: eval16.badge,
-                  priority: eval16.priority,
-                  timestamp: new Date().toISOString()
-                };
-                discoveries.push(disc16);
-                await notifyAll(disc16);
-              }
-            }
-          } catch (showErr) {
-            console.warn(`${logPrefix} Notice checking showtimes page for ${slug}: ${showErr.message}`);
           }
         }
       }
@@ -995,10 +884,9 @@ async function pollBookMyShow() {
 async function runSweep() {
   const sweepStart = new Date();
   console.log(`\n========================================================`);
-  console.log(`[Arrakis Radar] Mission-Critical Sweep Started at ${sweepStart.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`);
+  console.log(`[Arrakis Radar] Rows A–G Sweep Started at ${sweepStart.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`);
   console.log(`Target Movie : "${config.MOVIE_KEYWORD}" | City: ${config.CITY.toUpperCase()}`);
-  console.log(`Surveillance : 1) Basera Mall Alone (All Dates)`);
-  console.log(`             : 2) Other Theatres (16th Shows Alone)`);
+  console.log(`Surveillance : ONLY Desired Rows A–G (Elite Tier ₹508.34) at Palazzo & Luxe on 16th (Every Sweep)`);
   console.log(`Persisted IDs: ${notifiedSet.size} active show keys`);
   console.log(`========================================================`);
 
@@ -1010,29 +898,27 @@ async function runSweep() {
   const all = [...districtResults, ...bmsResults];
 
   if (all.length === 0) {
-    console.log(`[Arrakis Radar] No qualifying bookings matching [Basera Mall OR 16th Shows] found yet. Standing by...`);
+    console.log(`[Arrakis Radar] No open seats in Desired Rows A–G at Palazzo or Luxe (16th) yet. Standing by...`);
   } else {
-    console.log(`[Arrakis Radar] ✅ Found ${all.length} matching eligible shows across surveillance rules.`);
+    console.log(`[Arrakis Radar] ✅ Found ${all.length} matching Rows A–G openings!`);
   }
 
   // Write GitHub Step Summary if running in GitHub Actions
   if (STEP_SUMMARY_FILE) {
     try {
       const summaryMd = [
-        `## 🪐 Arrakis Radar — Mission Critical Sweep Summary`,
+        `## 🪐 Arrakis Radar — Rows A–G Sweep Summary`,
         `- **Timestamp:** ${new Date().toISOString()}`,
         `- **Target Movie:** \`${config.MOVIE_KEYWORD}\` (${config.CITY.toUpperCase()})`,
-        `- **Active Rules:**`,
-        `  - 🏛️ **Basera Mall Alone:** Unconditionally monitored for all shows`,
-        `  - 📅 **Other Theatres:** Narrowed to 16th shows alone`,
+        `- **Active Rule:** 💺 **Desired Rows A–G (Elite ₹508.34)** at **Palazzo & Luxe IMAX (16th)** — checked unconditionally every 5 mins`,
         `- **Persisted Show Keys:** ${notifiedSet.size}`,
-        `- **Eligible Shows Detected in this Sweep:** ${all.length}`,
+        `- **Rows A–G Openings Detected:** ${all.length}`,
         ...(all.length > 0 ? [
           `\n### 🎟️ Detected Shows`,
           `| Movie | Cinema | Date | Platform | Match Rule | URL |`,
           `| :--- | :--- | :--- | :--- | :--- | :--- |`,
           ...all.map(s => `| **${s.title}** | ${s.cinema} | ${s.showDate} | ${s.platform} | \`${s.badge}\` | [Book Now](${s.url}) |`)
-        ] : ['\n> *No new shows matching Basera Mall or 16th shows at other theatres yet.*'])
+        ] : ['\n> *No open seats in Rows A–G at Palazzo or Luxe (16th) yet.*'])
       ].join('\n');
 
       fs.appendFileSync(STEP_SUMMARY_FILE, summaryMd + '\n\n', 'utf8');
@@ -1048,49 +934,18 @@ async function runSweep() {
 }
 
 /**
- * Run Test Alert to verify notification pipeline
+ * Run Test Alert to verify notification pipeline (ONLY Rows A-G)
  */
 async function testAlert() {
-  console.log('[Test] Triggering test alerts for both Basera Mall and 16th Show at Other Theatres...');
-  
-  // 1. Basera Mall test show
-  const mockBasera = {
-    title: 'DUNE 3: MESSIAH (CHENNAI IMAX LASER)',
-    platform: 'District & BookMyShow [TEST ALERT]',
-    url: 'https://in.bookmyshow.com/cinemas/che/pvr-inox-basera-ecr-chennai/buytickets/BSER/',
-    city: config.CITY,
-    cinema: 'PVR INOX Basera Mall (ECR, Injambakkam)',
-    showDate: 'Opening Week (All Shows)',
-    format: 'IMAX Laser (1.90:1)',
-    status: 'BASERA MALL BOOKINGS LIVE NOW!',
-    ruleType: 'BASERA_MALL_EXCLUSIVE',
-    badge: '🏛️ BASERA MALL (ALL DATES)',
-    priority: 'HIGH'
-  };
+  console.log('[Test] Triggering test alert for Desired Rows A–G at Palazzo IMAX (16th)...');
 
-  // 2. 16th show at other theatre test
-  const mock16th = {
-    title: 'DUNE 3: MESSIAH (CHENNAI IMAX LASER)',
-    platform: 'District & BookMyShow [TEST ALERT]',
-    url: 'https://in.bookmyshow.com/explore/movies-chennai',
-    city: config.CITY,
-    cinema: 'PVR INOX Palazzo IMAX (Nexus Vijaya Vadapalani)',
-    showDate: 'December 16th (Special Fan Preview)',
-    format: 'IMAX Laser (1.90:1)',
-    status: '16TH SHOW ADDED AT PALAZZO!',
-    ruleType: 'OTHER_THEATRE_16TH',
-    badge: '📅 16TH SHOW EXCLUSIVE (PVR Palazzo IMAX)',
-    priority: 'CRITICAL'
-  };
-
-  // 3. Desired Rows A-G Radar at Palazzo on 16th test show
   const mockRowsAG = {
     title: 'DUNE 3: MESSIAH (CHENNAI IMAX LASER)',
     platform: 'BookMyShow & District [ROWS A-G RADAR]',
     url: 'https://in.bookmyshow.com/cinemas/che/pvr-palazzo-the-nexus-vijaya-mall-vadapalani-chennai/buytickets/PALZ/',
     city: config.CITY,
     cinema: 'PVR INOX Palazzo IMAX (Nexus Vijaya Vadapalani)',
-    showDate: 'December 16th (Close to Showtime)',
+    showDate: 'December 16th',
     showTime: '07:45 PM IMAX Laser',
     rows: 'Desired Rows A–G (Elite ₹508.34 - Top/Back Rows)',
     format: 'IMAX Laser (1.90:1)',
@@ -1100,14 +955,13 @@ async function testAlert() {
     priority: 'ULTRA_CRITICAL'
   };
 
-  await notifyAll(mockBasera);
-  await notifyAll(mock16th);
   await notifyAll(mockRowsAG);
-  console.log('[Test] All test alerts (Basera Mall, 16th Show, Rows A-G) dispatched! Check Telegram, Discord, and Ntfy app.');
+  console.log('[Test] Rows A–G test alert dispatched! Check Telegram, Discord, and Ntfy app.');
 }
 
 // CLI Execution Handler
 const args = process.argv.slice(2);
+const loopArg = args.find(a => a.startsWith('--loop-minutes='));
 
 if (args.includes('--test-alert')) {
   testAlert().then(() => process.exit(0));
@@ -1119,6 +973,26 @@ if (args.includes('--test-alert')) {
     console.error('[Arrakis Radar] Sweep fatal error:', err);
     process.exit(1);
   });
+} else if (loopArg) {
+  const minutes = parseInt(loopArg.split('=')[1], 10) || 180;
+  const intervalSec = parseInt(process.env.POLL_INTERVAL_SECONDS || '300', 10);
+  const endAt = Date.now() + minutes * 60 * 1000;
+  console.log(`[Arrakis Radar] Starting exact ${intervalSec}s (5-min) loop for ${minutes} minutes...`);
+  (async () => {
+    while (Date.now() < endAt) {
+      try {
+        await runSweep();
+      } catch (err) {
+        console.error('[Arrakis Radar] Loop sweep error:', err);
+      }
+      const remainingMs = endAt - Date.now();
+      if (remainingMs <= intervalSec * 1000) break;
+      console.log(`[Arrakis Radar] Sleeping ${intervalSec}s until next 5-minute sweep...`);
+      await new Promise(r => setTimeout(r, intervalSec * 1000));
+    }
+    console.log('[Arrakis Radar] Loop window finished cleanly. Handing off...');
+    process.exit(0);
+  })();
 } else {
   // Continuous Background Polling Loop
   console.log(`[Arrakis Radar] Starting background poller loop every ${config.POLL_INTERVAL_SECONDS}s...`);

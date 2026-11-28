@@ -90,13 +90,15 @@ def evaluate_show_eligibility(cinema_name, show_date, venue_details="", extra_co
     cinema_text = f"{cinema_name} {venue_details}".lower()
     date_str = str(show_date or "").strip().lower()
 
-    # Rule 1: Ultra-Priority - Desired Rows A-G (Elite Tier) at Palazzo or Luxe for 16th shows
+    # ONLY Rule: Desired Rows A-G (Elite Tier ₹508.34) at Palazzo or Luxe on the 16th (Checked every sweep)
     is_palazzo_or_luxe = any(k in cinema_text for k in ["palazzo", "luxe", "palz", "inlu"])
     is_16th = bool(re.search(r'(?:^|\D)16(?:th)?(?:\D|$)|-16\b|16-|\b16\b', date_str, re.I))
+    is_rows_ag_open = bool(
+        extra_context.get("is_rows_a_g_open") or
+        re.search(r'(?:rows?[-_\s]*[a-g]\b|elite|₹?508(?:\.34)?)', f"{venue_details} {extra_context.get('raw_seats', '')}", re.I)
+    )
 
-    is_elite_or_rows_ag = extra_context.get("is_rows_a_g_open") or bool(re.search(r'(?:rows?[-_\s]*[a-g]\b|elite|₹?508(?:\.34)?|prime|top\s*rows?)', f"{venue_details} {extra_context.get('raw_seats', '')}", re.I))
-
-    if is_palazzo_or_luxe and is_16th and (is_elite_or_rows_ag or extra_context.get("is_last_rows_open") or extra_context.get("is_late_release")):
+    if is_palazzo_or_luxe and is_16th and is_rows_ag_open:
         return {
             "eligible": True,
             "ruleType": "ROWS_A_TO_G_RELEASE",
@@ -105,28 +107,6 @@ def evaluate_show_eligibility(cinema_name, show_date, venue_details="", extra_co
             "cinema": cinema_name,
             "date": show_date or "16th",
             "rows": extra_context.get("rows", "Desired Rows A–G (Elite Tier ₹508.34)")
-        }
-
-    # Rule 2: Basera Mall
-    if CONFIG["PRIMARY_CINEMA"] in cinema_text or "basera" in cinema_text:
-        return {
-            "eligible": True,
-            "ruleType": "BASERA_MALL_EXCLUSIVE",
-            "priority": "HIGH",
-            "badge": "🏛️ BASERA MALL (ALL DATES)",
-            "cinema": cinema_name or "PVR INOX Basera Mall (ECR)",
-            "date": show_date or "All Open Dates"
-        }
-
-    # Rule 3: Other Theatres - 16th show alone
-    if is_16th:
-        return {
-            "eligible": True,
-            "ruleType": "OTHER_THEATRE_16TH",
-            "priority": "CRITICAL",
-            "badge": f"📅 16TH SHOW ADDED ({cinema_name or 'Other Theatre'})",
-            "cinema": cinema_name or "Other Chennai Multiplex",
-            "date": show_date or "16th"
         }
 
     return {
@@ -445,9 +425,8 @@ def poll_bms():
         headers["Cookie"] = CONFIG["BMS_COOKIE"]
 
     targets = [
-        {"name": "PVR INOX Basera ECR", "url": "https://in.bookmyshow.com/cinemas/che/pvr-inox-basera-ecr-chennai/buytickets/BSER/", "cinema": "PVR INOX Basera Mall (ECR)", "is_basera": True},
-        {"name": "PVR INOX Palazzo IMAX (16th Watcher)", "url": "https://in.bookmyshow.com/cinemas/che/pvr-palazzo-the-nexus-vijaya-mall-vadapalani-chennai/buytickets/PALZ/", "cinema": "PVR INOX Palazzo IMAX (Nexus Vijaya)", "watch_last_rows": True},
-        {"name": "PVR INOX Luxe IMAX (16th Watcher)", "url": "https://in.bookmyshow.com/cinemas/che/pvr-inox-luxe-phoenix-marketcity-velachery-chennai/buytickets/INLU/", "cinema": "PVR INOX Luxe IMAX (Phoenix Marketcity)", "watch_last_rows": True}
+        {"name": "PVR INOX Palazzo IMAX (16th Watcher)", "url": "https://in.bookmyshow.com/cinemas/che/pvr-palazzo-the-nexus-vijaya-mall-vadapalani-chennai/buytickets/PALZ/", "cinema": "PVR INOX Palazzo IMAX (Nexus Vijaya)"},
+        {"name": "PVR INOX Luxe IMAX (16th Watcher)", "url": "https://in.bookmyshow.com/cinemas/che/pvr-inox-luxe-phoenix-marketcity-velachery-chennai/buytickets/INLU/", "cinema": "PVR INOX Luxe IMAX (Phoenix Marketcity)"}
     ]
 
     discoveries = []
@@ -456,55 +435,37 @@ def poll_bms():
         if status != 200:
             continue
         has_movie = keyword in html.lower()
+        has_16th = bool(re.search(r'(?:16th|-16\b|16-|\b16\b)', html, re.I))
 
-        if tgt.get("watch_last_rows"):
-            has_16th = bool(re.search(r'(?:16th|-16\b|16-|\b16\b)', html, re.I))
-            if has_movie or has_16th:
-                has_rows_ag = bool(re.search(r'(?:rows?[-_\s]*[a-g]\b|elite|₹?508(?:\.34)?|prime|top\s*rows?|available|filling\s*fast)', html, re.I))
-                eval_res = evaluate_show_eligibility(tgt["cinema"], "16th Show", "Palazzo & Luxe 16th Radar", {
-                    "is_rows_a_g_open": has_rows_ag,
-                    "is_late_release": True,
-                    "rows": "Desired Rows A–G (Elite Tier ₹508.34)"
-                })
-                if eval_res["eligible"]:
-                    item = {
-                        "title": keyword.upper(),
-                        "platform": "BookMyShow",
-                        "url": tgt["url"],
-                        "city": city,
-                        "cinema": tgt["cinema"],
-                        "showDate": "16th Show",
-                        "rows": eval_res.get("rows"),
-                        "format": "IMAX Laser (1.90:1)",
-                        "status": "DESIRED ROWS A–G TICKETS OPENED!" if has_rows_ag else "16TH SHOW LIVE ON BMS!",
-                        "ruleType": eval_res["ruleType"],
-                        "badge": eval_res["badge"]
-                    }
-                    discoveries.append(item)
-                    dispatch_alerts(item)
-        elif tgt.get("is_basera") and has_movie:
-            eval_res = evaluate_show_eligibility("PVR INOX Basera Mall (ECR)", "Live Booking")
-            item = {
-                "title": keyword.upper(),
-                "platform": "BookMyShow",
-                "url": tgt["url"],
-                "city": city,
-                "cinema": "PVR INOX Basera Mall (ECR)",
-                "showDate": "Live Now",
-                "format": "IMAX Laser",
-                "status": "BASERA MALL BMS SHOWS LIVE!",
-                "ruleType": eval_res["ruleType"],
-                "badge": eval_res["badge"]
-            }
-            discoveries.append(item)
-            dispatch_alerts(item)
+        if has_movie and has_16th:
+            has_rows_ag = bool(re.search(r'(?:rows?[-_\s]*[a-g]\b|elite|₹?508(?:\.34)?)', html, re.I))
+            eval_res = evaluate_show_eligibility(tgt["cinema"], "16th Show", "Palazzo & Luxe 16th Rows A-G Radar", {
+                "is_rows_a_g_open": has_rows_ag,
+                "rows": "Desired Rows A–G (Elite Tier ₹508.34)"
+            })
+            if eval_res["eligible"]:
+                item = {
+                    "title": keyword.upper(),
+                    "platform": "BookMyShow",
+                    "url": tgt["url"],
+                    "city": city,
+                    "cinema": tgt["cinema"],
+                    "showDate": "16th Show",
+                    "rows": eval_res.get("rows"),
+                    "format": "IMAX Laser (1.90:1)",
+                    "status": "DESIRED ROWS A–G TICKETS OPENED!",
+                    "ruleType": eval_res["ruleType"],
+                    "badge": eval_res["badge"]
+                }
+                discoveries.append(item)
+                dispatch_alerts(item)
 
     return discoveries
 
 def run_sweep():
     print(f"\n========================================================")
-    print(f"[Arrakis Radar] Mission-Critical Sweep Started at {datetime.now().strftime('%H:%M:%S')}")
-    print(f"Rules: 1) Basera Mall (All Dates) | 2) Palazzo & Luxe (16th Last 5 Rows Radar) | 3) Other (16th Shows)")
+    print(f"[Arrakis Radar] Rows A–G Sweep Started at {datetime.now().strftime('%H:%M:%S')}")
+    print(f"Rule: ONLY Desired Rows A–G (Elite ₹508.34) at Palazzo & Luxe on 16th (Checked every sweep)")
     print(f"Active Persisted State Keys: {len(NOTIFIED_KEYS)}")
     print(f"========================================================")
 
@@ -512,54 +473,28 @@ def run_sweep():
     res_bms = poll_bms()
     all_res = res_district + res_bms
     if not all_res:
-        print("[Arrakis Radar] No qualifying bookings matching rules yet. Standing by...")
+        print("[Arrakis Radar] No open seats in Desired Rows A–G yet. Standing by...")
 
     send_ntfy_heartbeat(len(all_res))
     return all_res
 
 def test_alert():
-    print("[Test] Sending simulated test alerts for Basera Mall, 16th Shows, and Last 5 Rows...")
-    mock_basera = {
-        "title": "DUNE 3: MESSIAH (CHENNAI IMAX LASER)",
-        "platform": "District & BookMyShow [TEST]",
-        "url": "https://in.bookmyshow.com/cinemas/che/pvr-inox-basera-ecr-chennai/buytickets/BSER/",
-        "city": CONFIG["CITY"],
-        "cinema": "PVR INOX Basera Mall (ECR, Injambakkam)",
-        "showDate": "Opening Week (All Shows)",
-        "format": "IMAX Laser (1.90:1)",
-        "status": "BASERA MALL BOOKINGS LIVE NOW!",
-        "ruleType": "BASERA_MALL_EXCLUSIVE",
-        "badge": "🏛️ BASERA MALL (ALL DATES)"
-    }
-    mock_16th = {
-        "title": "DUNE 3: MESSIAH (CHENNAI IMAX LASER)",
-        "platform": "District & BookMyShow [TEST]",
-        "url": "https://in.bookmyshow.com/explore/movies-chennai",
-        "city": CONFIG["CITY"],
-        "cinema": "PVR INOX Palazzo IMAX (Vadapalani)",
-        "showDate": "December 16th (Fan Preview)",
-        "format": "IMAX Laser (1.90:1)",
-        "status": "16TH SHOW ADDED AT PALAZZO!",
-        "ruleType": "OTHER_THEATRE_16TH",
-        "badge": "📅 16TH SHOW EXCLUSIVE (PVR Palazzo IMAX)"
-    }
+    print("[Test] Sending simulated test alert for Desired Rows A–G...")
     mock_rows_ag = {
         "title": "DUNE 3: MESSIAH (CHENNAI IMAX LASER)",
         "platform": "BookMyShow & District [ROWS A-G RADAR]",
         "url": "https://in.bookmyshow.com/cinemas/che/pvr-palazzo-the-nexus-vijaya-mall-vadapalani-chennai/buytickets/PALZ/",
         "city": CONFIG["CITY"],
         "cinema": "PVR INOX Palazzo IMAX (Nexus Vijaya Vadapalani)",
-        "showDate": "December 16th (Close to Showtime)",
+        "showDate": "December 16th",
         "rows": "Desired Rows A–G (Elite ₹508.34 - Top/Back Rows)",
         "format": "IMAX Laser (1.90:1)",
         "status": "DESIRED ROWS A–G (ELITE SEATS) UNLOCKED ONLINE!",
         "ruleType": "ROWS_A_TO_G_RELEASE",
         "badge": "💺 ROWS A–G RELEASED (Palazzo IMAX - 16th)"
     }
-    dispatch_alerts(mock_basera)
-    dispatch_alerts(mock_16th)
     dispatch_alerts(mock_rows_ag)
-    print("[Test] Completed simulated test alerts.")
+    print("[Test] Completed simulated Rows A–G test alert.")
 
 if __name__ == "__main__":
     if "--test-alert" in sys.argv:

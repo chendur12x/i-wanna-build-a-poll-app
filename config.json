@@ -5,7 +5,7 @@
   "SEND_HEARTBEAT": true,
   "MOVIE_KEYWORD": "dune",
   "CITY": "chennai",
-  "PRIMARY_CINEMA": "basera",
-  "SECONDARY_CINEMA_DATE": "16"
+  "TARGET_CINEMAS": ["palazzo", "luxe"],
+  "TARGET_DATE": "16",
+  "TARGET_ROWS": "A-G"
 }
-

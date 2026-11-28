@@ -1,13 +1,13 @@
-name: Dune 3 IMAX Ticket Radar Poller
+name: Dune 3 IMAX Rows A-G Radar Poller
 
 on:
   schedule:
-    # Autonomous cloud poller: runs every 5 minutes around the clock
+    # Watchdog cron fallback: ensures loop stays alive if ever interrupted
     - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
       test_alert:
-        description: 'Send test alert to verify notification channels'
+        description: 'Send test alert for Rows A-G'
         required: false
         type: boolean
         default: false
@@ -17,14 +17,18 @@ on:
         type: string
         default: 'dune'
 
+permissions:
+  actions: write
+  contents: read
+
 concurrency:
   group: dune-imax-poller
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   poll-tickets:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 350
 
     steps:
       - name: Checkout repository
@@ -43,13 +47,12 @@ jobs:
           restore-keys: |
             radar-state-
 
-      - name: Execute Mission-Critical Radar Poller
+      - name: Execute Guaranteed 5-Min Rows A-G Radar Loop
         env:
           MOVIE_KEYWORD: ${{ inputs.movie_keyword || secrets.MOVIE_KEYWORD || 'dune' }}
           CITY: ${{ secrets.CITY || 'chennai' }}
           FORMAT_REQUIRED: ${{ secrets.FORMAT_REQUIRED || 'IMAX' }}
-          PRIMARY_CINEMA: ${{ secrets.PRIMARY_CINEMA || 'basera' }}
-          SECONDARY_CINEMA_DATE: ${{ secrets.SECONDARY_CINEMA_DATE || '16' }}
+          POLL_INTERVAL_SECONDS: '300'
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -64,8 +67,18 @@ jobs:
         run: |
           mkdir -p .cache
           if [ "${{ inputs.test_alert }}" = "true" ]; then
-            echo "[Workflow] Running simulated test alert verification..."
+            echo "[Workflow] Running simulated Rows A-G test alert..."
             node poller.js --test-alert
           fi
-          echo "[Workflow] Running mission-critical radar sweep..."
-          node poller.js --once
+          echo "[Workflow] Starting guaranteed 5-minute polling loop (300 minutes / 60 sweeps)..."
+          node poller.js --loop-minutes=300
+
+      - name: Chain Next 5-Hour Polling Cycle (Zero-Gap Continuity)
+        if: always()
+        run: |
+          echo "[Workflow] Triggering next 5-hour polling cycle via workflow_dispatch..."
+          curl -s -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/dune-imax-poller.yml/dispatches" \
+            -d '{"ref":"main"}' || true

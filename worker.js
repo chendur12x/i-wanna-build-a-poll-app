@@ -1,8 +1,7 @@
 /**
- * ARRAKIS RADAR - Cloudflare Worker Edge Poller (Mission-Critical Edition)
- * Surveillance Rules:
- * 1. Basera Mall Alone (All shows/dates)
- * 2. Other Theatres: 16th Shows Alone (New shows only)
+ * ARRAKIS RADAR - Cloudflare Worker Edge Poller
+ * Surveillance Rule:
+ * ONLY Desired Rows A-G (Elite Tier ₹508.34) at Palazzo & Luxe IMAX on the 16th (Checked every sweep)
  */
 
 export default {
@@ -21,50 +20,25 @@ export default {
     }
 
     if (url.pathname === '/test-alert') {
-      const mockBasera = {
-        title: 'DUNE 3: MESSIAH (CHENNAI IMAX LASER)',
-        platform: 'Cloudflare Worker [EDGE TEST]',
-        url: 'https://in.bookmyshow.com/cinemas/che/pvr-inox-basera-ecr-chennai/buytickets/BSER/',
-        city: env.CITY || 'chennai',
-        cinema: 'PVR INOX Basera Mall (ECR)',
-        showDate: 'All Open Dates',
-        format: 'IMAX Laser (1.90:1)',
-        status: 'BASERA MALL TICKETS LIVE!',
-        badge: '🏛️ BASERA MALL (ALL DATES)'
-      };
-      const mock16th = {
-        title: 'DUNE 3: MESSIAH (CHENNAI IMAX LASER)',
-        platform: 'Cloudflare Worker [EDGE TEST]',
-        url: 'https://in.bookmyshow.com/explore/movies-chennai',
-        city: env.CITY || 'chennai',
-        cinema: 'PVR INOX Palazzo IMAX (Nexus Vijaya)',
-        showDate: 'December 16th (Special Fan Show)',
-        format: 'IMAX Laser (1.90:1)',
-        status: '16TH SHOW ADDED AT PALAZZO!',
-        badge: '📅 16TH SHOW EXCLUSIVE (Palazzo IMAX)',
-        ruleType: 'OTHER_THEATRE_16TH'
-      };
       const mockRowsAG = {
         title: 'DUNE 3: MESSIAH (CHENNAI IMAX LASER)',
         platform: 'Cloudflare Worker [EDGE TEST]',
         url: 'https://in.bookmyshow.com/cinemas/che/pvr-palazzo-the-nexus-vijaya-mall-vadapalani-chennai/buytickets/PALZ/',
         city: env.CITY || 'chennai',
         cinema: 'PVR INOX Palazzo IMAX (Nexus Vijaya)',
-        showDate: 'December 16th (Rows A-G Released)',
+        showDate: 'December 16th',
         format: 'IMAX Laser (1.90:1)',
         status: 'DESIRED ROWS A-G (ELITE SEATS) RELEASED ONLINE!',
         badge: '💺 ROWS A–G RELEASED (Palazzo IMAX - 16th)',
         ruleType: 'ROWS_A_TO_G_RELEASE'
       };
-      await sendAlert(env, mockBasera);
-      await sendAlert(env, mock16th);
       await sendAlert(env, mockRowsAG);
-      return new Response(JSON.stringify({ status: 'ok', message: 'Test alerts dispatched for Basera Mall, 16th Show, and Rows A-G' }), {
+      return new Response(JSON.stringify({ status: 'ok', message: 'Test alert dispatched for Rows A-G (Palazzo/Luxe 16th)' }), {
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    return new Response('Arrakis Radar Cloudflare Worker is active (Mission Critical Mode: Basera Mall Alone + Other Theatres 16th Alone).', {
+    return new Response('Arrakis Radar Cloudflare Worker is active (Rows A-G Only: Palazzo & Luxe 16th).', {
       headers: { 'Content-Type': 'text/plain' }
     });
   }
@@ -74,24 +48,12 @@ function evaluateShowEligibility(cinemaName, showDate, venueDetails = '') {
   const cinemaText = `${cinemaName || ''} ${venueDetails || ''}`.toLowerCase();
   const dateStr = String(showDate || '').toLowerCase();
 
-  // Rule 1: Basera Mall (unconditionally for all dates/shows)
-  if (cinemaText.includes('basera')) {
-    return {
-      eligible: true,
-      ruleType: 'BASERA_MALL_EXCLUSIVE',
-      badge: '🏛️ BASERA MALL (ALL DATES)',
-      cinema: cinemaName || 'PVR INOX Basera Mall (ECR)',
-      date: showDate || 'All Open Dates'
-    };
-  }
-
-  // Rule 2 & 3: Palazzo & Luxe on 16th (Desired Rows A-G / Elite Tier)
+  // ONLY Rule: Palazzo & Luxe on 16th for Desired Rows A-G (Elite Tier ₹508.34)
   const isPalazzoOrLuxe = /palazzo|luxe|nexus|phoenix/i.test(cinemaText);
   const is16th = /(?:^|\D)16(?:th)?(?:\D|$)|-16\b|16-|\b16\b/i.test(dateStr);
-  const isRowsAGOpen = /rows?[-_\s]*[a-g]\b|elite|₹?508|prime|top\s*rows?|last\s*5\s*rows?|vip|recliner|held\s*seats?/i.test(venueDetails || '');
-  const isLateRelease = /late\s*release|held|released|opened|new\s*seats/i.test(venueDetails || '');
+  const isRowsAGOpen = /rows?[-_\s]*[a-g]\b|elite|₹?508/i.test(venueDetails || '');
 
-  if (isPalazzoOrLuxe && is16th && (isRowsAGOpen || isLateRelease)) {
+  if (isPalazzoOrLuxe && is16th && isRowsAGOpen) {
     return {
       eligible: true,
       ruleType: 'ROWS_A_TO_G_RELEASE',
@@ -99,17 +61,6 @@ function evaluateShowEligibility(cinemaName, showDate, venueDetails = '') {
       cinema: cinemaName || 'PVR INOX Palazzo / Luxe IMAX',
       date: showDate || '16th (Rows A-G)',
       isRowsAG: true
-    };
-  }
-
-  // Rule 3: Other Theatres - 16th show alone
-  if (is16th) {
-    return {
-      eligible: true,
-      ruleType: 'OTHER_THEATRE_16TH',
-      badge: `📅 16TH SHOW EXCLUSIVE (${cinemaName || 'Other Theatre'})`,
-      cinema: cinemaName || 'Other Chennai Multiplex',
-      date: showDate || '16th'
     };
   }
 
@@ -143,9 +94,15 @@ async function handleScheduledSweep(env) {
       const isBookingOpen = /book\s*tickets?|available|filling\s*fast/i.test(pageHtml);
       const hasImax = /IMAX/i.test(pageHtml) || /IMAX/i.test(slug);
 
-      // Check Basera
-      if (/basera/i.test(pageHtml)) {
-        const evalRes = evaluateShowEligibility('PVR INOX Basera Mall (ECR)', 'Live on District');
+      // Check ONLY Palazzo & Luxe on 16th for Rows A-G (Elite Tier ₹508.34)
+      const hasPalazzo = /palazzo/i.test(pageHtml);
+      const hasLuxe = /luxe/i.test(pageHtml);
+      const has16th = /(?:16th\s+[A-Za-z]+|[A-Za-z]+\s+16th|2026-12-16|2026-[0-9]{2}-16)/i.test(pageHtml);
+      const hasRowsAG = /(?:rows?[-_\s]*[a-g]\b|elite|₹?508)/i.test(pageHtml);
+
+      if ((hasPalazzo || hasLuxe) && has16th && hasRowsAG) {
+        const cName = hasPalazzo ? 'PVR INOX Palazzo IMAX (Nexus Vijaya)' : 'PVR INOX Luxe IMAX (Phoenix Marketcity)';
+        const evalRes = evaluateShowEligibility(cName, '16th Show', 'Rows A-G Elite');
         if (evalRes.eligible) {
           const item = {
             title: slug.replace(/-movie-tickets.*$/, '').replace(/-/g, ' ').toUpperCase(),
@@ -155,34 +112,12 @@ async function handleScheduledSweep(env) {
             cinema: evalRes.cinema,
             showDate: evalRes.date,
             format: hasImax ? 'IMAX Laser' : 'Standard',
-            status: isBookingOpen ? 'BOOKINGS LIVE NOW!' : 'Showtimes Listed',
-            badge: evalRes.badge
+            status: isBookingOpen ? 'ROWS A-G LIVE NOW!' : 'Rows A-G Listed',
+            badge: evalRes.badge,
+            ruleType: evalRes.ruleType
           };
           discoveries.push(item);
           await sendAlert(env, item);
-        }
-      }
-
-      // Check 16th shows
-      const dateMatches = pageHtml.match(/(?:16th\s+[A-Za-z]+|[A-Za-z]+\s+16th|2026-12-16|2026-[0-9]{2}-16)/gi);
-      if (dateMatches) {
-        for (const dm of new Set(dateMatches)) {
-          const evalRes = evaluateShowEligibility('Chennai Multiplex', dm);
-          if (evalRes.eligible) {
-            const item = {
-              title: slug.replace(/-movie-tickets.*$/, '').replace(/-/g, ' ').toUpperCase(),
-              platform: 'District (Zomato)',
-              url: `https://www.district.in/movies/${slug}`,
-              city,
-              cinema: evalRes.cinema,
-              showDate: dm,
-              format: hasImax ? 'IMAX Laser' : 'Standard',
-              status: isBookingOpen ? '16TH SHOW LIVE NOW!' : '16th Show Listed',
-              badge: evalRes.badge
-            };
-            discoveries.push(item);
-            await sendAlert(env, item);
-          }
         }
       }
     }
