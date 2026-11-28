@@ -38,7 +38,8 @@ let config = {
   TELEGRAM_BOT_TOKEN: (process.env.TELEGRAM_BOT_TOKEN || '').trim(),
   TELEGRAM_CHAT_ID: (process.env.TELEGRAM_CHAT_ID || '').trim(),
   DISCORD_WEBHOOK_URL: (process.env.DISCORD_WEBHOOK_URL || '').trim(),
-  NTFY_TOPIC: (process.env.NTFY_TOPIC || '').trim(),
+  NTFY_TOPIC: (process.env.NTFY_TOPIC || 'chendur12-dune-radar').trim(),
+  SEND_HEARTBEAT: process.env.SEND_HEARTBEAT !== 'false',
   BMS_COOKIE: (process.env.BMS_COOKIE || '').trim(),
 
   // Phone Call Alerts: Twilio Voice Call (Cellular phone call)
@@ -435,6 +436,41 @@ async function sendNtfyAlert(ticketInfo) {
     console.log(`[Alert/Ntfy] Mobile push sent to topic '${topic}'! HTTP ${res.status}`);
   } catch (e) {
     console.error(`[Alert/Ntfy] Failed to send: ${e.message}`);
+  }
+}
+
+/**
+ * Dispatch Low-Priority ntfy.sh Heartbeat Notification
+ * Verifies to the user that GitHub Actions is actively running every 5 minutes in the cloud
+ */
+async function sendNtfyHeartbeat(matchesCount = 0) {
+  if (!config.SEND_HEARTBEAT || !config.NTFY_TOPIC) return;
+  const topic = config.NTFY_TOPIC.replace(/^https?:\/\/ntfy\.sh\//, '').trim();
+  if (!topic) return;
+
+  const istTime = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
+  const runner = process.env.GITHUB_ACTIONS ? 'GitHub Actions Cloud' : 'Local Node Daemon';
+  const runId = process.env.GITHUB_RUN_ID ? ` #${process.env.GITHUB_RUN_ID}` : '';
+
+  const cleanTitle = `Arrakis Radar: Heartbeat OK (${istTime} IST)`.replace(/[^\x00-\x7F]/g, '').trim();
+  const body = matchesCount > 0
+    ? `[${runner}${runId}] Active sweep completed at ${istTime} IST. Matches detected: ${matchesCount}. Radar active.`
+    : `[${runner}${runId}] 5-min sweep complete at ${istTime} IST. Standing by. Monitored: Basera Mall (all dates), 16th shows, Rows A-G (Palazzo & Luxe).`;
+
+  try {
+    const res = await postJson(
+      `https://ntfy.sh/${topic}`,
+      body,
+      {
+        'Title': cleanTitle,
+        'Priority': 'low', // Low priority: silent, non-intrusive 5-minute heartbeat
+        'Tags': 'satellite,white_check_mark,clock',
+        'Click': 'https://chendur12x.github.io/i-wanna-build-a-poll-app/'
+      }
+    );
+    console.log(`[Heartbeat/Ntfy] Low-priority heartbeat dispatched to ntfy.sh/${topic} (HTTP ${res.status})`);
+  } catch (err) {
+    console.warn(`[Heartbeat/Ntfy] Failed to dispatch heartbeat: ${err.message}`);
   }
 }
 
@@ -1004,6 +1040,9 @@ async function runSweep() {
       console.warn(`[Summary] Failed to write step summary: ${summaryErr.message}`);
     }
   }
+
+  // 5-minute low priority heartbeat push via ntfy.sh (proves radar is running in GitHub Actions)
+  await sendNtfyHeartbeat(all.length);
 
   return all;
 }

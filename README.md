@@ -45,7 +45,7 @@ In GitHub repository **Settings** → **Secrets and variables** → **Actions**:
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token from `@BotFather` | *(optional)* |
 | `TELEGRAM_CHAT_ID` | Telegram chat ID from `@userinfobot` | *(optional)* |
 | `DISCORD_WEBHOOK_URL` | Discord webhook URL | *(optional)* |
-| `NTFY_TOPIC` | ntfy.sh topic for instant phone push | *(optional)* |
+| `NTFY_TOPIC` | ntfy.sh topic for instant phone push & 5-min heartbeat | `chendur12-dune-radar` |
 | `BMS_COOKIE` | Optional BookMyShow session cookie | *(optional)* |
 | `TWILIO_ACCOUNT_SID` | Twilio Account SID for cellular phone calls | *(optional)* |
 | `TWILIO_AUTH_TOKEN` | Twilio Auth Token | *(optional)* |
@@ -83,7 +83,8 @@ python3 poller.py --test-alert
 ## 🔔 Alert Channels Supported
 - **Telegram Bot**: Formatted Markdown messages with direct booking links.
 - **ntfy.sh**: Instant mobile notifications with ringtones on iOS & Android without requiring an account.
-- **Discord**: Rich embedded webhook cards with color-coded badges (Gold for Basera Mall, Cyan for 16th Shows).
+  - **5-Min Cloud Heartbeat**: Automatically sends a silent, low-priority ping every 5 minutes verifying that GitHub Actions is alive and running in the cloud (Topic: [`chendur12-dune-radar`](https://ntfy.sh/chendur12-dune-radar)).
+- **Discord**: Rich embedded webhook cards with color-coded badges (Gold for Basera Mall, Cyan for 16th Shows, Magenta for Rows A-G).
 
 ---
 

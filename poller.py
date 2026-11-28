@@ -35,7 +35,8 @@ CONFIG = {
     "TELEGRAM_BOT_TOKEN": os.getenv("TELEGRAM_BOT_TOKEN", "").strip(),
     "TELEGRAM_CHAT_ID": os.getenv("TELEGRAM_CHAT_ID", "").strip(),
     "DISCORD_WEBHOOK_URL": os.getenv("DISCORD_WEBHOOK_URL", "").strip(),
-    "NTFY_TOPIC": os.getenv("NTFY_TOPIC", "").strip(),
+    "NTFY_TOPIC": os.getenv("NTFY_TOPIC", "chendur12-dune-radar").strip(),
+    "SEND_HEARTBEAT": os.getenv("SEND_HEARTBEAT", "true").lower() != "false",
     "BMS_COOKIE": os.getenv("BMS_COOKIE", "").strip(),
     
     # Phone Call: Twilio Voice Call
@@ -272,6 +273,33 @@ def send_ntfy(ticket):
     post_json(f"https://ntfy.sh/{topic}", body, headers=headers)
     print(f"[Alert/Ntfy] Push sent to topic '{topic}'!")
 
+def send_ntfy_heartbeat(matches_count=0):
+    if not CONFIG.get("SEND_HEARTBEAT"):
+        return
+    topic = CONFIG["NTFY_TOPIC"].replace("https://ntfy.sh/", "").strip()
+    if not topic:
+        return
+    now_str = datetime.now().strftime("%H:%M")
+    runner = "GitHub Actions Cloud" if os.getenv("GITHUB_ACTIONS") else "Local Python Daemon"
+    title = f"Arrakis Radar: Heartbeat OK ({now_str} IST)"
+    clean_title = re.sub(r'[^\x00-\x7F]', '', title).strip()
+    body = (
+        f"[{runner}] Active sweep at {now_str} IST. Matches detected: {matches_count}. Radar operational."
+        if matches_count > 0
+        else f"[{runner}] 5-min sweep at {now_str} IST. Standing by. Monitored: Basera Mall (all dates), 16th shows, Rows A-G (Palazzo & Luxe)."
+    )
+    headers = {
+        "Title": clean_title,
+        "Priority": "low",
+        "Tags": "satellite,white_check_mark,clock",
+        "Click": "https://chendur12x.github.io/i-wanna-build-a-poll-app/"
+    }
+    try:
+        post_json(f"https://ntfy.sh/{topic}", body, headers=headers)
+        print(f"[Heartbeat/Ntfy] Low-priority heartbeat dispatched to ntfy.sh/{topic}!")
+    except Exception as e:
+        print(f"[Heartbeat/Ntfy] Failed to dispatch heartbeat: {e}")
+
 def send_voice_call(ticket):
     is_rows_ag = ticket.get("ruleType") in ["ROWS_A_TO_G_RELEASE", "LAST_5_ROWS_LATE_RELEASE"]
     is_basera = ticket.get("ruleType") == "BASERA_MALL_EXCLUSIVE"
@@ -485,6 +513,8 @@ def run_sweep():
     all_res = res_district + res_bms
     if not all_res:
         print("[Arrakis Radar] No qualifying bookings matching rules yet. Standing by...")
+
+    send_ntfy_heartbeat(len(all_res))
     return all_res
 
 def test_alert():
