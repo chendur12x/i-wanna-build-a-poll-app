@@ -89,19 +89,21 @@ def evaluate_show_eligibility(cinema_name, show_date, venue_details="", extra_co
     cinema_text = f"{cinema_name} {venue_details}".lower()
     date_str = str(show_date or "").strip().lower()
 
-    # Rule 1: Ultra-Priority - Last 5 Rows Radar at Palazzo or Luxe for 16th shows
+    # Rule 1: Ultra-Priority - Desired Rows A-G (Elite Tier) at Palazzo or Luxe for 16th shows
     is_palazzo_or_luxe = any(k in cinema_text for k in ["palazzo", "luxe", "palz", "inlu"])
     is_16th = bool(re.search(r'(?:^|\D)16(?:th)?(?:\D|$)|-16\b|16-|\b16\b', date_str, re.I))
 
-    if is_palazzo_or_luxe and is_16th and (extra_context.get("is_last_rows_open") or extra_context.get("is_late_release")):
+    is_elite_or_rows_ag = extra_context.get("is_rows_a_g_open") or bool(re.search(r'(?:rows?[-_\s]*[a-g]\b|elite|₹?508(?:\.34)?|prime|top\s*rows?)', f"{venue_details} {extra_context.get('raw_seats', '')}", re.I))
+
+    if is_palazzo_or_luxe and is_16th and (is_elite_or_rows_ag or extra_context.get("is_last_rows_open") or extra_context.get("is_late_release")):
         return {
             "eligible": True,
-            "ruleType": "LAST_5_ROWS_LATE_RELEASE",
+            "ruleType": "ROWS_A_TO_G_RELEASE",
             "priority": "ULTRA_CRITICAL",
-            "badge": f"💺 LAST 5 ROWS RELEASED ({cinema_name})",
+            "badge": f"💺 ROWS A–G RELEASED ({cinema_name})",
             "cinema": cinema_name,
             "date": show_date or "16th",
-            "rows": extra_context.get("rows", "Last 5 Rows (Prime/VIP/Recliner)")
+            "rows": extra_context.get("rows", "Desired Rows A–G (Elite Tier ₹508.34)")
         }
 
     # Rule 2: Basera Mall
@@ -246,11 +248,11 @@ def send_ntfy(ticket):
     topic = CONFIG["NTFY_TOPIC"].replace("https://ntfy.sh/", "").strip()
     if not topic:
         return
-    is_last_rows = ticket.get("ruleType") == "LAST_5_ROWS_LATE_RELEASE"
+    is_rows_ag = ticket.get("ruleType") in ["ROWS_A_TO_G_RELEASE", "LAST_5_ROWS_LATE_RELEASE"]
     is_basera = ticket.get("ruleType") == "BASERA_MALL_EXCLUSIVE"
 
-    if is_last_rows:
-        raw_title = f"LAST 5 ROWS OPENED: {ticket.get('cinema', 'PALAZZO/LUXE')} (16TH)!"
+    if is_rows_ag:
+        raw_title = f"ROWS A-G OPENED: {ticket.get('cinema', 'PALAZZO/LUXE')} (16TH)!"
         tags = "seat,rotating_light,fire,star"
     elif is_basera:
         raw_title = "BASERA MALL DUNE 3 TICKETS LIVE!"
@@ -271,11 +273,11 @@ def send_ntfy(ticket):
     print(f"[Alert/Ntfy] Push sent to topic '{topic}'!")
 
 def send_voice_call(ticket):
-    is_last_rows = ticket.get("ruleType") == "LAST_5_ROWS_LATE_RELEASE"
+    is_rows_ag = ticket.get("ruleType") in ["ROWS_A_TO_G_RELEASE", "LAST_5_ROWS_LATE_RELEASE"]
     is_basera = ticket.get("ruleType") == "BASERA_MALL_EXCLUSIVE"
 
-    if is_last_rows:
-        msg = f"Urgent VIP alert! Tickets in the last 5 rows have just opened up at {ticket.get('cinema', 'cinema')} for the 16th show! Open app and book immediately!"
+    if is_rows_ag:
+        msg = f"Urgent seat alert! Desired rows A to G tickets have just opened up at {ticket.get('cinema', 'cinema')} for the 16th show! Open app and book immediately!"
     elif is_basera:
         msg = "Urgent ticket alert! Dune 3 tickets are now live at Basera Mall Chennai. Check notifications and book immediately!"
     else:
@@ -430,11 +432,11 @@ def poll_bms():
         if tgt.get("watch_last_rows"):
             has_16th = bool(re.search(r'(?:16th|-16\b|16-|\b16\b)', html, re.I))
             if has_movie or has_16th:
-                has_last_rows = bool(re.search(r'(?:recliners?|prime|club|elite|row\s*[p-z]|available|filling\s*fast)', html, re.I))
+                has_rows_ag = bool(re.search(r'(?:rows?[-_\s]*[a-g]\b|elite|₹?508(?:\.34)?|prime|top\s*rows?|available|filling\s*fast)', html, re.I))
                 eval_res = evaluate_show_eligibility(tgt["cinema"], "16th Show", "Palazzo & Luxe 16th Radar", {
-                    "is_last_rows_open": has_last_rows,
+                    "is_rows_a_g_open": has_rows_ag,
                     "is_late_release": True,
-                    "rows": "Last 5 Rows (Prime/VIP/Recliners)"
+                    "rows": "Desired Rows A–G (Elite Tier ₹508.34)"
                 })
                 if eval_res["eligible"]:
                     item = {
@@ -446,7 +448,7 @@ def poll_bms():
                         "showDate": "16th Show",
                         "rows": eval_res.get("rows"),
                         "format": "IMAX Laser (1.90:1)",
-                        "status": "LAST 5 ROWS TICKETS OPENED!" if has_last_rows else "16TH SHOW LIVE ON BMS!",
+                        "status": "DESIRED ROWS A–G TICKETS OPENED!" if has_rows_ag else "16TH SHOW LIVE ON BMS!",
                         "ruleType": eval_res["ruleType"],
                         "badge": eval_res["badge"]
                     }
@@ -511,22 +513,22 @@ def test_alert():
         "ruleType": "OTHER_THEATRE_16TH",
         "badge": "📅 16TH SHOW EXCLUSIVE (PVR Palazzo IMAX)"
     }
-    mock_last_rows = {
+    mock_rows_ag = {
         "title": "DUNE 3: MESSIAH (CHENNAI IMAX LASER)",
-        "platform": "BookMyShow & District [LAST 5 ROWS RADAR]",
+        "platform": "BookMyShow & District [ROWS A-G RADAR]",
         "url": "https://in.bookmyshow.com/cinemas/che/pvr-palazzo-the-nexus-vijaya-mall-vadapalani-chennai/buytickets/PALZ/",
         "city": CONFIG["CITY"],
         "cinema": "PVR INOX Palazzo IMAX (Nexus Vijaya Vadapalani)",
         "showDate": "December 16th (Close to Showtime)",
-        "rows": "Last 5 Rows (Rows P, Q, R, S, T - Prime Recliner)",
+        "rows": "Desired Rows A–G (Elite ₹508.34 - Top/Back Rows)",
         "format": "IMAX Laser (1.90:1)",
-        "status": "LAST 5 ROWS RELEASED ONLINE CLOSE TO SHOWTIME!",
-        "ruleType": "LAST_5_ROWS_LATE_RELEASE",
-        "badge": "💺 LAST 5 ROWS RELEASED (Palazzo IMAX - 16th)"
+        "status": "DESIRED ROWS A–G (ELITE SEATS) UNLOCKED ONLINE!",
+        "ruleType": "ROWS_A_TO_G_RELEASE",
+        "badge": "💺 ROWS A–G RELEASED (Palazzo IMAX - 16th)"
     }
     dispatch_alerts(mock_basera)
     dispatch_alerts(mock_16th)
-    dispatch_alerts(mock_last_rows)
+    dispatch_alerts(mock_rows_ag)
     print("[Test] Completed simulated test alerts.")
 
 if __name__ == "__main__":

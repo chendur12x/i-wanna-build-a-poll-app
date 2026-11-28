@@ -13,9 +13,10 @@ The surveillance logic has been narrowed down to the following strict criteria:
 2. 📅 **Other Theatres (16th Shows Alone)**:
    - For all other Chennai multiplexes (e.g. Palazzo Vadapalani, Luxe Phoenix Marketcity, etc.), surveillance is strictly narrowed down to **newly added shows on the 16th alone**.
    - Any show on dates other than the 16th is filtered out.
-3. 💺 **Last 5 Rows / Late Release Radar (Palazzo & Luxe 16th Alone)**:
-   - Always actively monitors for seats in the **last 5 rows** (Rows P, Q, R, S, T, and VIP Recliners) opening close to showtime for **PVR INOX Palazzo IMAX (Screen 10)** and **PVR INOX Luxe IMAX (Screen 11)** on the **16th**.
-   - Detects late unblocking of held/VIP seats and instantly triggers an `ULTRA_CRITICAL` multi-channel alert and automated phone call.
+3. 💺 **Desired Rows A–G Radar (Palazzo & Luxe 16th Alone)**:
+   - On BookMyShow & District for **PVR INOX Palazzo IMAX (Screen 10)** and **PVR INOX Luxe IMAX (Screen 11)**, the screen is at the bottom of the seating chart, making **Rows A through G** the coveted **Elite Tier (₹508.34)** top/rear rows (farthest from screen with optimal IMAX sightlines and acoustics).
+   - Surveillance actively inspects seat layouts and availability specifically for unblocked seats in **Rows A, B, C, D, E, F, G** for **16th shows**.
+   - Detects late unblocking of held/VIP quota seats and instantly triggers an `ULTRA_CRITICAL` multi-channel alert and automated phone call to `@chendur12`.
 4. 🛡️ **Mission-Critical Deduplication**:
    - Persists detected show hashes in `.cache/seen_shows.json` across GitHub Actions executions using `actions/cache@v4`.
    - Prevents duplicate alert spam while guaranteeing zero missed new show additions.

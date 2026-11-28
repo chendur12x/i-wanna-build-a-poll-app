@@ -114,20 +114,23 @@ function evaluateShowEligibility(cinemaName, showDate, venueDetails = '', extraC
   const cinemaText = `${cinemaName || ''} ${venueDetails || ''}`.toLowerCase();
   const dateStr = String(showDate || '').trim().toLowerCase();
 
-  // Rule 1: Ultra-Priority - Last 5 Rows / Late Release at Palazzo or Luxe for 16th shows
+  // Rule 1: Ultra-Priority - Desired Rows A-G (Elite Tier) at Palazzo or Luxe for 16th shows
   const isPalazzoOrLuxe = cinemaText.includes('palazzo') || cinemaText.includes('luxe') || cinemaText.includes('palz') || cinemaText.includes('inlu');
   const is16th = /(?:^|\D)16(?:th)?(?:\D|$)|-16\b|16-|\b16\b/i.test(dateStr);
 
-  if (isPalazzoOrLuxe && is16th && (extraContext.isLastRowsOpen || extraContext.isLateRelease || extraContext.isCloseToShowtime)) {
+  const isEliteOrRowsAG = extraContext.isRowsAGOpen || extraContext.isEliteTierOpen ||
+    /(?:rows?[-_\s]*[a-g]\b|elite|₹?508(?:\.34)?|prime|top\s*rows?)/i.test(`${venueDetails || ''} ${extraContext.rawSeats || ''} ${extraContext.status || ''}`);
+
+  if (isPalazzoOrLuxe && is16th && (isEliteOrRowsAG || extraContext.isLastRowsOpen || extraContext.isLateRelease || extraContext.isCloseToShowtime)) {
     return {
       eligible: true,
-      ruleType: 'LAST_5_ROWS_LATE_RELEASE',
+      ruleType: 'ROWS_A_TO_G_RELEASE',
       priority: 'ULTRA_CRITICAL',
-      badge: `💺 LAST 5 ROWS RELEASED (${cinemaName})`,
+      badge: `💺 ROWS A–G RELEASED (${cinemaName})`,
       cinema: cinemaName,
       date: showDate || '16th',
-      rows: extraContext.rows || 'Last 5 Rows (Prime/VIP/Recliner)',
-      reason: 'Detected last 5 rows / late release seats opening close to showtime on 16th'
+      rows: extraContext.rows || 'Desired Rows A–G (Elite Tier ₹508.34)',
+      reason: 'Detected seats in desired Rows A-G (Elite tier) opening close to showtime on 16th'
     };
   }
 
@@ -290,12 +293,12 @@ function postJson(targetUrl, jsonBody, customHeaders = {}) {
 async function sendTelegramAlert(ticketInfo) {
   if (!config.TELEGRAM_BOT_TOKEN || !config.TELEGRAM_CHAT_ID) return;
 
-  const isLastRows = ticketInfo.ruleType === 'LAST_5_ROWS_LATE_RELEASE';
+  const isRowsAG = ticketInfo.ruleType === 'ROWS_A_TO_G_RELEASE' || ticketInfo.ruleType === 'LAST_5_ROWS_LATE_RELEASE';
   const isBasera = ticketInfo.ruleType === 'BASERA_MALL_EXCLUSIVE';
   
   let headerTitle = '';
-  if (isLastRows) {
-    headerTitle = `🚨💺 *LAST 5 ROWS TICKETS OPENED: ${ticketInfo.cinema.toUpperCase()} (16TH SHOW)!* 🚨`;
+  if (isRowsAG) {
+    headerTitle = `🚨💺 *DESIRED ROWS A–G TICKETS OPENED: ${ticketInfo.cinema.toUpperCase()} (16TH SHOW)!* 🚨`;
   } else if (isBasera) {
     headerTitle = '🚨 *BASERA MALL EXCLUSIVE: DUNE 3 TICKETS!* 🚨';
   } else {
@@ -341,15 +344,15 @@ async function sendTelegramAlert(ticketInfo) {
 async function sendDiscordAlert(ticketInfo) {
   if (!config.DISCORD_WEBHOOK_URL) return;
 
-  const isLastRows = ticketInfo.ruleType === 'LAST_5_ROWS_LATE_RELEASE';
+  const isRowsAG = ticketInfo.ruleType === 'ROWS_A_TO_G_RELEASE' || ticketInfo.ruleType === 'LAST_5_ROWS_LATE_RELEASE';
   const isBasera = ticketInfo.ruleType === 'BASERA_MALL_EXCLUSIVE';
 
   let embedColor = 0x06b6d4;
   let alertHeadline = '';
 
-  if (isLastRows) {
+  if (isRowsAG) {
     embedColor = 0xff0055; // High-urgency magenta/red
-    alertHeadline = `🚨💺 @everyone **LAST 5 ROWS TICKETS JUST OPENED AT ${ticketInfo.cinema.toUpperCase()} FOR 16TH!** 🎟️`;
+    alertHeadline = `🚨💺 @everyone **DESIRED ROWS A–G TICKETS JUST OPENED AT ${ticketInfo.cinema.toUpperCase()} FOR 16TH!** 🎟️`;
   } else if (isBasera) {
     embedColor = 0xe5a93c;
     alertHeadline = '🚨 @everyone **BASERA MALL TICKETS ARE LIVE! BOOK NOW!** 🏛️';
@@ -399,14 +402,14 @@ async function sendNtfyAlert(ticketInfo) {
   const topic = config.NTFY_TOPIC.replace(/^https?:\/\/ntfy\.sh\//, '').trim();
   if (!topic) return;
 
-  const isLastRows = ticketInfo.ruleType === 'LAST_5_ROWS_LATE_RELEASE';
+  const isRowsAG = ticketInfo.ruleType === 'ROWS_A_TO_G_RELEASE' || ticketInfo.ruleType === 'LAST_5_ROWS_LATE_RELEASE';
   const isBasera = ticketInfo.ruleType === 'BASERA_MALL_EXCLUSIVE';
 
   let rawTitle = '';
   let tags = 'rotating_light,ticket,fire';
 
-  if (isLastRows) {
-    rawTitle = `LAST 5 ROWS OPENED: ${ticketInfo.cinema || 'PALAZZO/LUXE'} (16TH)!`;
+  if (isRowsAG) {
+    rawTitle = `ROWS A-G OPENED: ${ticketInfo.cinema || 'PALAZZO/LUXE'} (16TH)!`;
     tags = 'seat,rotating_light,fire,star';
   } else if (isBasera) {
     rawTitle = 'BASERA MALL DUNE 3 TICKETS LIVE!';
@@ -484,12 +487,12 @@ function postForm(targetUrl, formBody, customHeaders = {}) {
  * Dispatch Automated Voice Call Alert (Twilio Cellular Call & CallMeBot Telegram Call)
  */
 async function sendVoiceCallAlert(ticketInfo) {
-  const isLastRows = ticketInfo.ruleType === 'LAST_5_ROWS_LATE_RELEASE';
+  const isRowsAG = ticketInfo.ruleType === 'ROWS_A_TO_G_RELEASE' || ticketInfo.ruleType === 'LAST_5_ROWS_LATE_RELEASE';
   const isBasera = ticketInfo.ruleType === 'BASERA_MALL_EXCLUSIVE';
 
   let spokenMessage = '';
-  if (isLastRows) {
-    spokenMessage = `Urgent VIP alert! Tickets in the last 5 rows have just opened up at ${ticketInfo.cinema} for the 16th show! Open your app and book your seats immediately!`;
+  if (isRowsAG) {
+    spokenMessage = `Urgent seat alert! Desired rows A to G tickets have just opened up at ${ticketInfo.cinema} for the 16th show! Open your app and book your seats immediately!`;
   } else if (isBasera) {
     spokenMessage = `Urgent ticket alert! Dune 3 tickets are now live at Basera Mall Chennai. Check your notifications and book tickets immediately!`;
   } else {
@@ -523,7 +526,10 @@ async function sendVoiceCallAlert(ticketInfo) {
     const rawUser = config.CALLMEBOT_TELEGRAM_USER.replace(/^@/, '').trim();
     console.log(`[Call/CallMeBot] 📞 Triggering Telegram voice call to @${rawUser}...`);
     try {
-      const callUrl = `https://api.callmebot.com/start.php?user=@${rawUser}&text=${encodeURIComponent(spokenMessage)}&lang=en-US-Standard-B`;
+      const shortMsg = isRowsAG
+        ? `Urgent! Desired rows A to G tickets just opened at Palazzo or Luxe IMAX for 16th show! Book now!`
+        : (isBasera ? `Urgent! Dune 3 tickets are now live at Basera Mall Chennai. Book immediately!` : `Urgent! New 16th show added at Chennai multiplex. Book now!`);
+      const callUrl = `https://api.callmebot.com/start.php?user=@${rawUser}&text=${encodeURIComponent(shortMsg)}&lang=en-US-Standard-B`;
       const res = await fetchUrl(callUrl);
       console.log(`[Call/CallMeBot] Telegram voice call triggered! HTTP ${res.status}`);
     } catch (err) {
@@ -778,18 +784,18 @@ async function pollBookMyShow() {
       cinemaName: 'PVR INOX Basera Mall (ECR)'
     },
     {
-      name: 'PVR INOX Palazzo IMAX Vadapalani (16th & Last 5 Rows Radar)',
+      name: 'PVR INOX Palazzo IMAX Vadapalani (16th & Rows A-G Radar)',
       url: `https://in.bookmyshow.com/cinemas/che/pvr-palazzo-the-nexus-vijaya-mall-vadapalani-chennai/buytickets/PALZ/`,
       isCinemaDirect: true,
       cinemaName: 'PVR INOX Palazzo IMAX (Nexus Vijaya)',
-      watch16thLastRows: true
+      watch16thRowsAG: true
     },
     {
-      name: 'PVR INOX Luxe IMAX Velachery (16th & Last 5 Rows Radar)',
+      name: 'PVR INOX Luxe IMAX Velachery (16th & Rows A-G Radar)',
       url: `https://in.bookmyshow.com/cinemas/che/pvr-inox-luxe-phoenix-marketcity-velachery-chennai/buytickets/INLU/`,
       isCinemaDirect: true,
       cinemaName: 'PVR INOX Luxe IMAX (Phoenix Marketcity)',
-      watch16thLastRows: true
+      watch16thRowsAG: true
     }
   ];
 
@@ -813,18 +819,19 @@ async function pollBookMyShow() {
           const movieRegex = new RegExp(config.MOVIE_KEYWORD, 'i');
           const hasMovie = movieRegex.test(html);
 
-          // For Palazzo and Luxe 16th & Last 5 Rows Radar:
-          if (target.watch16thLastRows) {
+          // For Palazzo and Luxe 16th & Rows A-G Radar:
+          if (target.watch16thRowsAG || target.watch16thLastRows) {
             const has16th = /(?:16th|-16\b|16-|\b16\b)/i.test(html);
             if (hasMovie || has16th) {
-              const hasLastRows = /(?:recliners?|prime|club|elite|row\s*[p-z]|available|filling\s*fast)/i.test(html);
+              const hasRowsAG = /(?:rows?[-_\s]*[a-g]\b|elite|₹?508(?:\.34)?|prime|top\s*rows?|available|filling\s*fast)/i.test(html);
               const isCloseTime = /today|tomorrow|mins|hrs|pm|am/i.test(html);
 
               const evalRes = evaluateShowEligibility(target.cinemaName, '16th Show', 'Palazzo & Luxe 16th Radar', {
-                isLastRowsOpen: hasLastRows,
+                isRowsAGOpen: hasRowsAG,
+                isEliteTierOpen: hasRowsAG,
                 isLateRelease: true,
                 isCloseToShowtime: isCloseTime,
-                rows: 'Last 5 Rows (Prime/VIP/Recliners)'
+                rows: 'Desired Rows A–G (Elite Tier ₹508.34)'
               });
 
               if (evalRes.eligible) {
@@ -837,7 +844,7 @@ async function pollBookMyShow() {
                   showDate: '16th Show',
                   rows: evalRes.rows,
                   format: 'IMAX Laser (1.90:1)',
-                  status: hasLastRows ? 'LAST 5 ROWS TICKETS OPENED ONLINE!' : '16TH SHOW AVAILABLE AT PALAZZO/LUXE',
+                  status: hasRowsAG ? 'DESIRED ROWS A–G TICKETS OPENED ONLINE!' : '16TH SHOW AVAILABLE AT PALAZZO/LUXE',
                   ruleType: evalRes.ruleType,
                   badge: evalRes.badge,
                   priority: evalRes.priority,
@@ -1037,27 +1044,27 @@ async function testAlert() {
     priority: 'CRITICAL'
   };
 
-  // 3. Last 5 Rows Radar at Palazzo on 16th test show
-  const mockLastRows = {
+  // 3. Desired Rows A-G Radar at Palazzo on 16th test show
+  const mockRowsAG = {
     title: 'DUNE 3: MESSIAH (CHENNAI IMAX LASER)',
-    platform: 'BookMyShow & District [LAST 5 ROWS RADAR]',
+    platform: 'BookMyShow & District [ROWS A-G RADAR]',
     url: 'https://in.bookmyshow.com/cinemas/che/pvr-palazzo-the-nexus-vijaya-mall-vadapalani-chennai/buytickets/PALZ/',
     city: config.CITY,
     cinema: 'PVR INOX Palazzo IMAX (Nexus Vijaya Vadapalani)',
     showDate: 'December 16th (Close to Showtime)',
-    showTime: '10:15 PM IMAX Laser',
-    rows: 'Last 5 Rows (Rows P, Q, R, S, T - Prime Recliner)',
+    showTime: '07:45 PM IMAX Laser',
+    rows: 'Desired Rows A–G (Elite ₹508.34 - Top/Back Rows)',
     format: 'IMAX Laser (1.90:1)',
-    status: 'LAST 5 ROWS RELEASED ONLINE CLOSE TO SHOWTIME!',
-    ruleType: 'LAST_5_ROWS_LATE_RELEASE',
-    badge: '💺 LAST 5 ROWS RELEASED (Palazzo IMAX - 16th)',
+    status: 'DESIRED ROWS A–G (ELITE SEATS) UNLOCKED ONLINE!',
+    ruleType: 'ROWS_A_TO_G_RELEASE',
+    badge: '💺 ROWS A–G RELEASED (Palazzo IMAX - 16th)',
     priority: 'ULTRA_CRITICAL'
   };
 
   await notifyAll(mockBasera);
   await notifyAll(mock16th);
-  await notifyAll(mockLastRows);
-  console.log('[Test] All test alerts (Basera Mall, 16th Show, Last 5 Rows) dispatched! Check Telegram, Discord, and Ntfy app.');
+  await notifyAll(mockRowsAG);
+  console.log('[Test] All test alerts (Basera Mall, 16th Show, Rows A-G) dispatched! Check Telegram, Discord, and Ntfy app.');
 }
 
 // CLI Execution Handler

@@ -233,12 +233,12 @@
             <span class="text-amber-400 text-xs font-mono font-bold">MISSION CRITICAL</span>
           </div>
           <div class="text-base font-bold font-dune text-white">
-            Basera & 16th + Last 5 Rows
+            Basera & 16th + Rows A–G
           </div>
           <div class="mt-2 flex gap-1.5 flex-wrap">
             <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 font-semibold">Basera Mall (All Shows)</span>
             <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-semibold">Other Theatres (16th Alone)</span>
-            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-fuchsia-950 text-fuchsia-300 border border-fuchsia-800 font-semibold">💺 Last 5 Rows Radar (Palazzo & Luxe 16th)</span>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-fuchsia-950 text-fuchsia-300 border border-fuchsia-800 font-semibold">💺 Rows A–G Radar (Palazzo & Luxe 16th)</span>
           </div>
         </div>
       </div>
@@ -474,8 +474,8 @@
               <div>• Screen: <strong class="text-white">~70 ft × 39 ft Massive Screen</strong></div>
               <div>• Audio: <strong class="text-cyan-300">12-Channel Immersive Sound</strong></div>
               <div class="pt-1 text-[10px] text-fuchsia-300 flex items-center gap-1 font-bold">
-                <span>💺 Last 5 Rows Radar:</span>
-                <span class="px-1.5 py-0.5 rounded bg-fuchsia-950 border border-fuchsia-800 text-fuchsia-200">ACTIVE (16th Shows)</span>
+                <span>💺 Desired Rows A–G Radar:</span>
+                <span class="px-1.5 py-0.5 rounded bg-fuchsia-950 border border-fuchsia-800 text-fuchsia-200">ACTIVE (16th Shows - Elite ₹508.34)</span>
               </div>
             </div>
             <div class="flex items-center gap-2 pt-1 text-xs font-mono">
@@ -505,8 +505,8 @@
               <div>• Tech: <strong class="text-white">High-Fidelity IMAX Dual Setup</strong></div>
               <div>• Landmark: <strong class="text-cyan-300">Chennai's Pioneer IMAX Theater</strong></div>
               <div class="pt-1 text-[10px] text-fuchsia-300 flex items-center gap-1 font-bold">
-                <span>💺 Last 5 Rows Radar:</span>
-                <span class="px-1.5 py-0.5 rounded bg-fuchsia-950 border border-fuchsia-800 text-fuchsia-200">ACTIVE (16th Shows)</span>
+                <span>💺 Desired Rows A–G Radar:</span>
+                <span class="px-1.5 py-0.5 rounded bg-fuchsia-950 border border-fuchsia-800 text-fuchsia-200">ACTIVE (16th Shows - Elite ₹508.34)</span>
               </div>
             </div>
             <div class="flex items-center gap-2 pt-1 text-xs font-mono">
@@ -830,14 +830,14 @@
               <div class="text-[10px] text-cyan-400 font-mono group-hover:underline">Run 16th Show Test →</div>
             </button>
 
-            <!-- Test 3: Last 5 Rows Radar (Palazzo & Luxe) -->
-            <button onclick="testSpecificAlert('last_5_rows')" class="p-3 rounded-xl bg-obsidian-950 border border-fuchsia-800/60 hover:border-fuchsia-500 transition text-left space-y-1.5 group">
+            <!-- Test 3: Desired Rows A-G Radar (Palazzo & Luxe) -->
+            <button onclick="testSpecificAlert('rows_a_g')" class="p-3 rounded-xl bg-obsidian-950 border border-fuchsia-800/60 hover:border-fuchsia-500 transition text-left space-y-1.5 group">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-mono font-bold text-fuchsia-300">💺 Last 5 Rows Radar</span>
+                <span class="text-xs font-mono font-bold text-fuchsia-300">💺 Desired Rows A–G Radar</span>
                 <span class="text-[9px] font-mono text-fuchsia-400 bg-fuchsia-950 px-1.5 py-0.5 rounded border border-fuchsia-800">Rule 3</span>
               </div>
-              <p class="text-[11px] text-slate-400">Simulate VIP held seats opening in last 5 rows close to showtime on 16th.</p>
-              <div class="text-[10px] text-fuchsia-400 font-mono group-hover:underline">Run Last 5 Rows Test →</div>
+              <p class="text-[11px] text-slate-400">Simulate seats opening in desired Rows A-G (Elite tier ₹508.34) close to showtime on 16th.</p>
+              <div class="text-[10px] text-fuchsia-400 font-mono group-hover:underline">Run Rows A–G Test →</div>
             </button>
           </div>
         </div>
@@ -1485,12 +1485,12 @@ DISCORD_WEBHOOK_URL="${cfg.DISCORD_WEBHOOK_URL}"`;
         showDate = 'Opening Week (All Dates)';
         spokenText = 'Urgent ticket alert! Dune 3 tickets are now live at Basera Mall Chennai. Book immediately!';
         ntfyTags = 'rotating_light,ticket,fire';
-      } else if (scenario === 'last_5_rows') {
-        badge = '💺 LAST 5 ROWS RELEASED (Palazzo IMAX - 16th)';
+      } else if (scenario === 'rows_a_g' || scenario === 'last_5_rows') {
+        badge = '💺 ROWS A–G RELEASED (Palazzo IMAX - 16th)';
         title = 'DUNE 3: MESSIAH (CHENNAI IMAX LASER)';
         cinema = 'PVR INOX Palazzo IMAX (Screen 10)';
         showDate = 'December 16th (Close to Showtime)';
-        spokenText = 'Urgent VIP seat alert! Last 5 rows tickets just opened at Palazzo and Luxe IMAX for the 16th show! Book your seats right now!';
+        spokenText = 'Urgent seat alert! Desired rows A to G tickets just opened at Palazzo and Luxe IMAX for the 16th show! Book your seats right now!';
         ntfyTags = 'seat,rotating_light,fire,star';
       } else {
         badge = '📅 16TH SHOW EXCLUSIVE (Other Multiplex)';
