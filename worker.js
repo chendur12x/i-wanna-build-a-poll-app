@@ -41,11 +41,25 @@ export default {
         showDate: 'December 16th (Special Fan Show)',
         format: 'IMAX Laser (1.90:1)',
         status: '16TH SHOW ADDED AT PALAZZO!',
-        badge: '📅 16TH SHOW EXCLUSIVE (Palazzo IMAX)'
+        badge: '📅 16TH SHOW EXCLUSIVE (Palazzo IMAX)',
+        ruleType: 'OTHER_THEATRE_16TH'
+      };
+      const mockLastRows = {
+        title: 'DUNE 3: MESSIAH (CHENNAI IMAX LASER)',
+        platform: 'Cloudflare Worker [EDGE TEST]',
+        url: 'https://in.bookmyshow.com/cinemas/che/pvr-palazzo-the-nexus-vijaya-mall-vadapalani-chennai/buytickets/PALZ/',
+        city: env.CITY || 'chennai',
+        cinema: 'PVR INOX Palazzo IMAX (Nexus Vijaya)',
+        showDate: 'December 16th (Last 5 Rows Released)',
+        format: 'IMAX Laser (1.90:1)',
+        status: 'LAST 5 ROWS / VIP RELEASED ONLINE!',
+        badge: '💺 LAST 5 ROWS RELEASED (Palazzo IMAX - 16th)',
+        ruleType: 'LAST_5_ROWS_LATE_RELEASE'
       };
       await sendAlert(env, mockBasera);
       await sendAlert(env, mock16th);
-      return new Response(JSON.stringify({ status: 'ok', message: 'Test alerts dispatched for Basera Mall and 16th Show' }), {
+      await sendAlert(env, mockLastRows);
+      return new Response(JSON.stringify({ status: 'ok', message: 'Test alerts dispatched for Basera Mall, 16th Show, and Last 5 Rows' }), {
         headers: { 'Content-Type': 'application/json' }
       });
     }
@@ -60,21 +74,39 @@ function evaluateShowEligibility(cinemaName, showDate, venueDetails = '') {
   const cinemaText = `${cinemaName || ''} ${venueDetails || ''}`.toLowerCase();
   const dateStr = String(showDate || '').toLowerCase();
 
-  // Rule 1: Basera Mall
+  // Rule 1: Basera Mall (unconditionally for all dates/shows)
   if (cinemaText.includes('basera')) {
     return {
       eligible: true,
+      ruleType: 'BASERA_MALL_EXCLUSIVE',
       badge: '🏛️ BASERA MALL (ALL DATES)',
       cinema: cinemaName || 'PVR INOX Basera Mall (ECR)',
       date: showDate || 'All Open Dates'
     };
   }
 
-  // Rule 2: Other Theatres - 16th show alone
+  // Rule 2 & 3: Palazzo & Luxe on 16th (Last 5 rows / VIP late release)
+  const isPalazzoOrLuxe = /palazzo|luxe|nexus|phoenix/i.test(cinemaText);
   const is16th = /(?:^|\D)16(?:th)?(?:\D|$)|-16\b|16-|\b16\b/i.test(dateStr);
+  const isLastRowsOpen = /last\s*5\s*rows?|vip|recliner|rows?\s*[p-t]|prime|held\s*seats?/i.test(venueDetails || '');
+  const isLateRelease = /late\s*release|held|released|opened|new\s*seats/i.test(venueDetails || '');
+
+  if (isPalazzoOrLuxe && is16th && (isLastRowsOpen || isLateRelease)) {
+    return {
+      eligible: true,
+      ruleType: 'LAST_5_ROWS_LATE_RELEASE',
+      badge: `💺 LAST 5 ROWS RELEASED (${cinemaName || 'Palazzo/Luxe'})`,
+      cinema: cinemaName || 'PVR INOX Palazzo / Luxe IMAX',
+      date: showDate || '16th (Last 5 Rows)',
+      isLastRows: true
+    };
+  }
+
+  // Rule 3: Other Theatres - 16th show alone
   if (is16th) {
     return {
       eligible: true,
+      ruleType: 'OTHER_THEATRE_16TH',
       badge: `📅 16TH SHOW EXCLUSIVE (${cinemaName || 'Other Theatre'})`,
       cinema: cinemaName || 'Other Chennai Multiplex',
       date: showDate || '16th'
@@ -178,6 +210,9 @@ async function sendAlert(env, ticket) {
 
   // Discord
   if (env.DISCORD_WEBHOOK_URL) {
+    const isLastRows = ticket.ruleType === 'LAST_5_ROWS_LATE_RELEASE';
+    const isBasera = ticket.ruleType === 'BASERA_MALL_EXCLUSIVE';
+    const embedColor = isLastRows ? 0xe91e63 : (isBasera ? 0xe5a93c : 0x06b6d4);
     await fetch(env.DISCORD_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -187,7 +222,7 @@ async function sendAlert(env, ticket) {
           title: `🔥 ${ticket.title} — ${ticket.cinema}`,
           url: ticket.url,
           description: `Booking is active on **${ticket.platform}**!`,
-          color: 0xe5a93c
+          color: embedColor
         }]
       })
     });
@@ -197,12 +232,13 @@ async function sendAlert(env, ticket) {
   if (env.NTFY_TOPIC) {
     const topic = env.NTFY_TOPIC.replace('https://ntfy.sh/', '').trim();
     const cleanTitle = (ticket.badge || 'TICKET ALERT').replace(/[^\x00-\x7F]/g, '').trim();
+    const isLastRows = ticket.ruleType === 'LAST_5_ROWS_LATE_RELEASE';
     await fetch(`https://ntfy.sh/${topic}`, {
       method: 'POST',
       headers: {
         'Title': cleanTitle,
         'Priority': 'urgent',
-        'Tags': 'rotating_light,ticket,fire',
+        'Tags': isLastRows ? 'seat,rotating_light,fire,star' : 'rotating_light,ticket,fire',
         'Click': ticket.url
       },
       body: `${ticket.title} at ${ticket.cinema} (${ticket.showDate}) is LIVE!`
@@ -210,10 +246,14 @@ async function sendAlert(env, ticket) {
   }
 
   // Voice Call Alerts (Twilio & CallMeBot)
-  const isBasera = ticket.ruleType === 'BASERA_MALL_EXCLUSIVE';
-  const spoken = isBasera
-    ? `Urgent ticket alert! Dune 3 tickets are now live at Basera Mall Chennai. Book immediately!`
-    : `Urgent ticket alert! A new 16th show has just been added at ${ticket.cinema || 'Chennai multiplex'}. Book now!`;
+  let spoken;
+  if (ticket.ruleType === 'LAST_5_ROWS_LATE_RELEASE') {
+    spoken = `Urgent VIP seat alert! Last 5 rows tickets just opened at ${ticket.cinema || 'Palazzo or Luxe IMAX'} for the 16th show! Book your seats right now!`;
+  } else if (ticket.ruleType === 'BASERA_MALL_EXCLUSIVE') {
+    spoken = `Urgent ticket alert! Dune 3 tickets are now live at Basera Mall Chennai. Book immediately!`;
+  } else {
+    spoken = `Urgent ticket alert! A new 16th show has just been added at ${ticket.cinema || 'Chennai multiplex'}. Book now!`;
+  }
 
   // 1. Twilio Voice Call
   if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM_NUMBER && env.TO_PHONE_NUMBER) {

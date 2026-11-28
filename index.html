@@ -233,11 +233,12 @@
             <span class="text-amber-400 text-xs font-mono font-bold">MISSION CRITICAL</span>
           </div>
           <div class="text-base font-bold font-dune text-white">
-            Basera Mall & 16th Shows
+            Basera & 16th + Last 5 Rows
           </div>
           <div class="mt-2 flex gap-1.5 flex-wrap">
             <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 font-semibold">Basera Mall (All Shows)</span>
             <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-semibold">Other Theatres (16th Alone)</span>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-fuchsia-950 text-fuchsia-300 border border-fuchsia-800 font-semibold">💺 Last 5 Rows Radar (Palazzo & Luxe 16th)</span>
           </div>
         </div>
       </div>
@@ -472,6 +473,10 @@
               <div>• Tech: <strong class="text-amber-300">4K IMAX with Laser (1.90:1)</strong></div>
               <div>• Screen: <strong class="text-white">~70 ft × 39 ft Massive Screen</strong></div>
               <div>• Audio: <strong class="text-cyan-300">12-Channel Immersive Sound</strong></div>
+              <div class="pt-1 text-[10px] text-fuchsia-300 flex items-center gap-1 font-bold">
+                <span>💺 Last 5 Rows Radar:</span>
+                <span class="px-1.5 py-0.5 rounded bg-fuchsia-950 border border-fuchsia-800 text-fuchsia-200">ACTIVE (16th Shows)</span>
+              </div>
             </div>
             <div class="flex items-center gap-2 pt-1 text-xs font-mono">
               <a href="https://in.bookmyshow.com/buytickets/pvr-palazzo-the-nexus-vijaya-mall-vadapalani-chennai/cinema-che-PALZ-MT/" target="_blank" class="flex-1 text-center py-1.5 px-2 rounded-lg bg-obsidian-800 hover:bg-obsidian-700 text-spice-300 border border-obsidian-700 transition">
@@ -499,6 +504,10 @@
               <div>• Luxury: <strong class="text-amber-300">Plush Recliner & Club Seating</strong></div>
               <div>• Tech: <strong class="text-white">High-Fidelity IMAX Dual Setup</strong></div>
               <div>• Landmark: <strong class="text-cyan-300">Chennai's Pioneer IMAX Theater</strong></div>
+              <div class="pt-1 text-[10px] text-fuchsia-300 flex items-center gap-1 font-bold">
+                <span>💺 Last 5 Rows Radar:</span>
+                <span class="px-1.5 py-0.5 rounded bg-fuchsia-950 border border-fuchsia-800 text-fuchsia-200">ACTIVE (16th Shows)</span>
+              </div>
             </div>
             <div class="flex items-center gap-2 pt-1 text-xs font-mono">
               <a href="https://in.bookmyshow.com/buytickets/pvr-inox-luxe-phoenix-marketcity-velachery-chennai/cinema-che-INLU-MT/" target="_blank" class="flex-1 text-center py-1.5 px-2 rounded-lg bg-obsidian-800 hover:bg-obsidian-700 text-spice-300 border border-obsidian-700 transition">
@@ -782,6 +791,54 @@
                 <i data-lucide="phone-outgoing" class="w-3.5 h-3.5"></i> Test Voice Call Now
               </button>
             </div>
+          </div>
+        </div>
+
+        <!-- Mission-Critical Scenario Verification -->
+        <div class="col-span-1 md:col-span-2 bg-obsidian-900 border border-obsidian-800 rounded-2xl p-5 space-y-4">
+          <div class="flex items-center justify-between border-b border-obsidian-800 pb-3">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg bg-fuchsia-500/20 text-fuchsia-400 flex items-center justify-center font-bold">
+                <i data-lucide="shield-alert" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-white text-sm">Mission-Critical Scenario Verifiers</h3>
+                <p class="text-[11px] text-slate-400 font-mono">Test each specific surveillance rule against all configured alert channels</p>
+              </div>
+            </div>
+            <span class="text-[10px] font-mono text-fuchsia-400 px-2 py-0.5 rounded bg-fuchsia-950 border border-fuchsia-800">Pipeline Tests</span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <!-- Test 1: Basera Mall -->
+            <button onclick="testSpecificAlert('basera')" class="p-3 rounded-xl bg-obsidian-950 border border-amber-800/60 hover:border-amber-500 transition text-left space-y-1.5 group">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-mono font-bold text-amber-300">🏛️ Basera Mall Alone</span>
+                <span class="text-[9px] font-mono text-amber-400 bg-amber-950 px-1.5 py-0.5 rounded border border-amber-800">Rule 1</span>
+              </div>
+              <p class="text-[11px] text-slate-400">Simulate ticket drop for Basera Mall (unconditional all-dates alert).</p>
+              <div class="text-[10px] text-amber-400 font-mono group-hover:underline">Run Basera Test Alert →</div>
+            </button>
+
+            <!-- Test 2: Other Theatres 16th Show -->
+            <button onclick="testSpecificAlert('16th')" class="p-3 rounded-xl bg-obsidian-950 border border-cyan-800/60 hover:border-cyan-500 transition text-left space-y-1.5 group">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-mono font-bold text-cyan-300">📅 16th Shows Alone</span>
+                <span class="text-[9px] font-mono text-cyan-400 bg-cyan-950 px-1.5 py-0.5 rounded border border-cyan-800">Rule 2</span>
+              </div>
+              <p class="text-[11px] text-slate-400">Simulate newly added show on the 16th at Chennai multiplexes.</p>
+              <div class="text-[10px] text-cyan-400 font-mono group-hover:underline">Run 16th Show Test →</div>
+            </button>
+
+            <!-- Test 3: Last 5 Rows Radar (Palazzo & Luxe) -->
+            <button onclick="testSpecificAlert('last_5_rows')" class="p-3 rounded-xl bg-obsidian-950 border border-fuchsia-800/60 hover:border-fuchsia-500 transition text-left space-y-1.5 group">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-mono font-bold text-fuchsia-300">💺 Last 5 Rows Radar</span>
+                <span class="text-[9px] font-mono text-fuchsia-400 bg-fuchsia-950 px-1.5 py-0.5 rounded border border-fuchsia-800">Rule 3</span>
+              </div>
+              <p class="text-[11px] text-slate-400">Simulate VIP held seats opening in last 5 rows close to showtime on 16th.</p>
+              <div class="text-[10px] text-fuchsia-400 font-mono group-hover:underline">Run Last 5 Rows Test →</div>
+            </button>
           </div>
         </div>
 
@@ -1409,6 +1466,91 @@ DISCORD_WEBHOOK_URL="${cfg.DISCORD_WEBHOOK_URL}"`;
           alert(`Voice call trigger error: ${err.message}`);
         }
       }
+    }
+
+    // Direct Specific Scenario Simulation (Basera Mall, 16th Show, Last 5 Rows)
+    async function testSpecificAlert(scenario) {
+      saveNotificationSettings();
+      const tgToken = document.getElementById('cfgTelegramToken')?.value.trim() || '';
+      const tgChat = document.getElementById('cfgTelegramChatId')?.value.trim() || '';
+      const ntfyTopic = document.getElementById('cfgNtfyTopic')?.value.trim().replace('https://ntfy.sh/', '') || '';
+      const discordWh = document.getElementById('cfgDiscordWebhook')?.value.trim() || '';
+      const callmebotUser = document.getElementById('cfgCallMeBotUser')?.value.trim().replace(/^@/, '') || '';
+
+      let badge, title, cinema, showDate, spokenText, ntfyTags;
+      if (scenario === 'basera') {
+        badge = '🏛️ BASERA MALL (ALL DATES)';
+        title = 'DUNE 3: MESSIAH (CHENNAI IMAX LASER)';
+        cinema = 'PVR INOX Basera Mall (ECR, Injambakkam)';
+        showDate = 'Opening Week (All Dates)';
+        spokenText = 'Urgent ticket alert! Dune 3 tickets are now live at Basera Mall Chennai. Book immediately!';
+        ntfyTags = 'rotating_light,ticket,fire';
+      } else if (scenario === 'last_5_rows') {
+        badge = '💺 LAST 5 ROWS RELEASED (Palazzo IMAX - 16th)';
+        title = 'DUNE 3: MESSIAH (CHENNAI IMAX LASER)';
+        cinema = 'PVR INOX Palazzo IMAX (Screen 10)';
+        showDate = 'December 16th (Close to Showtime)';
+        spokenText = 'Urgent VIP seat alert! Last 5 rows tickets just opened at Palazzo and Luxe IMAX for the 16th show! Book your seats right now!';
+        ntfyTags = 'seat,rotating_light,fire,star';
+      } else {
+        badge = '📅 16TH SHOW EXCLUSIVE (Other Multiplex)';
+        title = 'DUNE 3: MESSIAH (CHENNAI IMAX LASER)';
+        cinema = 'PVR INOX Luxe IMAX (Screen 11)';
+        showDate = 'December 16th (New Show Added)';
+        spokenText = 'Urgent ticket alert! A new 16th show has just been added at Luxe IMAX. Book now!';
+        ntfyTags = 'calendar,rotating_light,fire';
+      }
+
+      log(`[TEST SIMULATOR] Dispatching simulated alert for '${badge}'...`);
+      playImaxAlertSiren();
+
+      // Dispatch to /api/test-alert if backend is available
+      try {
+        await fetch('/api/test-alert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegramToken: tgToken,
+            telegramChatId: tgChat,
+            discordWebhook: discordWh,
+            ntfyTopic: ntfyTopic,
+            callmebotUser: callmebotUser
+          })
+        });
+      } catch (_) {}
+
+      // Fallback direct ntfy push
+      if (ntfyTopic) {
+        try {
+          const cleanTitle = badge.replace(/[^\x00-\x7F]/g, '').trim();
+          await fetch(`https://ntfy.sh/${ntfyTopic}`, {
+            method: 'POST',
+            headers: {
+              'Title': cleanTitle,
+              'Priority': 'urgent',
+              'Tags': ntfyTags,
+              'Click': 'https://in.bookmyshow.com/explore/movies-chennai'
+            },
+            body: `${title} at ${cinema} (${showDate}) is LIVE! ${spokenText}`
+          });
+          log(`[NTFY] Dispatched ${badge} to topic '${ntfyTopic}'`, 'success');
+        } catch (e) {
+          log(`[NTFY] Error: ${e.message}`, 'warn');
+        }
+      }
+
+      // Voice call via CallMeBot if configured
+      if (callmebotUser) {
+        try {
+          const callUrl = `https://api.callmebot.com/start.php?user=@${callmebotUser}&text=${encodeURIComponent(spokenText)}&lang=en-US-Standard-B`;
+          window.open(callUrl, '_blank', 'width=400,height=300');
+          log(`[VOICE CALL] Ringing @${callmebotUser} for ${badge}`, 'success');
+        } catch (err) {
+          log(`[VOICE CALL] Error: ${err.message}`, 'warn');
+        }
+      }
+
+      alert(`Simulated alert '${badge}' dispatched! Check your phone and sound alert.`);
     }
 
     // Trigger Immediate Sweep

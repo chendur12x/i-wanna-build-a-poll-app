@@ -83,11 +83,28 @@ def save_state(keys_set):
 
 NOTIFIED_KEYS = load_state()
 
-def evaluate_show_eligibility(cinema_name, show_date, venue_details=""):
+def evaluate_show_eligibility(cinema_name, show_date, venue_details="", extra_context=None):
+    if extra_context is None:
+        extra_context = {}
     cinema_text = f"{cinema_name} {venue_details}".lower()
     date_str = str(show_date or "").strip().lower()
 
-    # Rule 1: Basera Mall
+    # Rule 1: Ultra-Priority - Last 5 Rows Radar at Palazzo or Luxe for 16th shows
+    is_palazzo_or_luxe = any(k in cinema_text for k in ["palazzo", "luxe", "palz", "inlu"])
+    is_16th = bool(re.search(r'(?:^|\D)16(?:th)?(?:\D|$)|-16\b|16-|\b16\b', date_str, re.I))
+
+    if is_palazzo_or_luxe and is_16th and (extra_context.get("is_last_rows_open") or extra_context.get("is_late_release")):
+        return {
+            "eligible": True,
+            "ruleType": "LAST_5_ROWS_LATE_RELEASE",
+            "priority": "ULTRA_CRITICAL",
+            "badge": f"💺 LAST 5 ROWS RELEASED ({cinema_name})",
+            "cinema": cinema_name,
+            "date": show_date or "16th",
+            "rows": extra_context.get("rows", "Last 5 Rows (Prime/VIP/Recliner)")
+        }
+
+    # Rule 2: Basera Mall
     if CONFIG["PRIMARY_CINEMA"] in cinema_text or "basera" in cinema_text:
         return {
             "eligible": True,
@@ -98,8 +115,7 @@ def evaluate_show_eligibility(cinema_name, show_date, venue_details=""):
             "date": show_date or "All Open Dates"
         }
 
-    # Rule 2: Other Theatres - 16th show alone
-    is_16th = bool(re.search(r'(?:^|\D)16(?:th)?(?:\D|$)|-16\b|16-|\b16\b', date_str, re.I))
+    # Rule 3: Other Theatres - 16th show alone
     if is_16th:
         return {
             "eligible": True,
@@ -157,8 +173,16 @@ def send_telegram(ticket):
     chat_id = CONFIG["TELEGRAM_CHAT_ID"]
     if not token or not chat_id:
         return
+    is_last_rows = ticket.get("ruleType") == "LAST_5_ROWS_LATE_RELEASE"
     is_basera = ticket.get("ruleType") == "BASERA_MALL_EXCLUSIVE"
-    header = "🚨 *BASERA MALL EXCLUSIVE: DUNE 3 TICKETS!* 🚨" if is_basera else "🚨 *16TH SHOW ADDED: OTHER THEATRE TICKETS!* 🚨"
+    
+    if is_last_rows:
+        header = f"🚨💺 *LAST 5 ROWS TICKETS OPENED: {ticket.get('cinema', '').upper()} (16TH SHOW)!* 🚨"
+    elif is_basera:
+        header = "🚨 *BASERA MALL EXCLUSIVE: DUNE 3 TICKETS!* 🚨"
+    else:
+        header = "🚨 *16TH SHOW ADDED: OTHER THEATRE TICKETS!* 🚨"
+
     text = (
         f"{header}\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -166,6 +190,7 @@ def send_telegram(ticket):
         f"🎯 *Filter Match:* {ticket.get('badge')}\n"
         f"🏛️ *Cinema:* {ticket.get('cinema')}\n"
         f"📅 *Show Date:* {ticket.get('showDate')}\n"
+        + (f"💺 *Monitored Rows:* {ticket['rows']}\n" if ticket.get('rows') else "") +
         f"🎞️ *Format:* {ticket.get('format', 'IMAX Laser')}\n"
         f"📍 *Platform:* {ticket.get('platform')}\n"
         f"🎟️ *Status:* *{ticket.get('status')}*\n"
@@ -185,15 +210,26 @@ def send_discord(ticket):
     webhook = CONFIG["DISCORD_WEBHOOK_URL"]
     if not webhook:
         return
+    is_last_rows = ticket.get("ruleType") == "LAST_5_ROWS_LATE_RELEASE"
     is_basera = ticket.get("ruleType") == "BASERA_MALL_EXCLUSIVE"
-    headline = "🚨 @everyone **BASERA MALL TICKETS LIVE! BOOK NOW!** 🏛️" if is_basera else "🚨 @everyone **NEW 16TH SHOW DETECTED AT OTHER THEATRE!** 📅"
+
+    if is_last_rows:
+        headline = f"🚨💺 @everyone **LAST 5 ROWS TICKETS JUST OPENED AT {ticket.get('cinema', '').upper()} (16TH SHOW)!** 🎟️"
+        color = 0xff0055
+    elif is_basera:
+        headline = "🚨 @everyone **BASERA MALL TICKETS LIVE! BOOK NOW!** 🏛️"
+        color = 0xe5a93c
+    else:
+        headline = "🚨 @everyone **NEW 16TH SHOW DETECTED AT OTHER THEATRE!** 📅"
+        color = 0x06b6d4
+
     payload = {
         "content": headline,
         "embeds": [{
             "title": f"🔥 {ticket['title']} — {ticket.get('cinema')}",
             "url": ticket["url"],
             "description": f"⚡ **Filter Match:** `{ticket.get('badge')}`\nBooking live now on **{ticket['platform']}**!",
-            "color": 0xe5a93c if is_basera else 0x06b6d4,
+            "color": color,
             "fields": [
                 {"name": "🏛️ Cinema", "value": ticket.get("cinema", "Basera Mall"), "inline": True},
                 {"name": "📅 Show Date", "value": ticket.get("showDate", "Open"), "inline": True},
@@ -210,13 +246,24 @@ def send_ntfy(ticket):
     topic = CONFIG["NTFY_TOPIC"].replace("https://ntfy.sh/", "").strip()
     if not topic:
         return
+    is_last_rows = ticket.get("ruleType") == "LAST_5_ROWS_LATE_RELEASE"
     is_basera = ticket.get("ruleType") == "BASERA_MALL_EXCLUSIVE"
-    raw_title = "BASERA MALL DUNE 3 TICKETS LIVE!" if is_basera else f"16TH SHOW ADDED: {ticket.get('cinema', 'CHENNAI')}!"
+
+    if is_last_rows:
+        raw_title = f"LAST 5 ROWS OPENED: {ticket.get('cinema', 'PALAZZO/LUXE')} (16TH)!"
+        tags = "seat,rotating_light,fire,star"
+    elif is_basera:
+        raw_title = "BASERA MALL DUNE 3 TICKETS LIVE!"
+        tags = "rotating_light,star,ticket,fire"
+    else:
+        raw_title = f"16TH SHOW ADDED: {ticket.get('cinema', 'CHENNAI')}!"
+        tags = "calendar,ticket,movie_camera"
+
     clean_title = re.sub(r'[^\x00-\x7F]', '', raw_title).strip()
     headers = {
         "Title": clean_title,
         "Priority": "urgent",
-        "Tags": "rotating_light,star,ticket,fire" if is_basera else "calendar,ticket,movie_camera",
+        "Tags": tags,
         "Click": ticket["url"]
     }
     body = f"{ticket.get('badge')}: {ticket['title']} ({ticket.get('format', 'IMAX')}). Tap to book!"
@@ -224,12 +271,15 @@ def send_ntfy(ticket):
     print(f"[Alert/Ntfy] Push sent to topic '{topic}'!")
 
 def send_voice_call(ticket):
+    is_last_rows = ticket.get("ruleType") == "LAST_5_ROWS_LATE_RELEASE"
     is_basera = ticket.get("ruleType") == "BASERA_MALL_EXCLUSIVE"
-    msg = (
-        "Urgent ticket alert! Dune 3 tickets are now live at Basera Mall Chennai. Check notifications and book immediately!"
-        if is_basera else
-        f"Urgent ticket alert! A new 16th show has just been added at {ticket.get('cinema', 'Chennai multiplex')}. Check notifications to book now!"
-    )
+
+    if is_last_rows:
+        msg = f"Urgent VIP alert! Tickets in the last 5 rows have just opened up at {ticket.get('cinema', 'cinema')} for the 16th show! Open app and book immediately!"
+    elif is_basera:
+        msg = "Urgent ticket alert! Dune 3 tickets are now live at Basera Mall Chennai. Check notifications and book immediately!"
+    else:
+        msg = f"Urgent ticket alert! A new 16th show has just been added at {ticket.get('cinema', 'Chennai multiplex')}. Check notifications to book now!"
 
     # 1. Twilio Voice Call
     sid = CONFIG["TWILIO_ACCOUNT_SID"]
@@ -364,31 +414,67 @@ def poll_bms():
     if CONFIG["BMS_COOKIE"]:
         headers["Cookie"] = CONFIG["BMS_COOKIE"]
 
-    status, html = fetch_url(f"https://in.bookmyshow.com/cinemas/che/pvr-inox-basera-ecr-chennai/buytickets/BSER/", headers=headers)
+    targets = [
+        {"name": "PVR INOX Basera ECR", "url": "https://in.bookmyshow.com/cinemas/che/pvr-inox-basera-ecr-chennai/buytickets/BSER/", "cinema": "PVR INOX Basera Mall (ECR)", "is_basera": True},
+        {"name": "PVR INOX Palazzo IMAX (16th Watcher)", "url": "https://in.bookmyshow.com/cinemas/che/pvr-palazzo-the-nexus-vijaya-mall-vadapalani-chennai/buytickets/PALZ/", "cinema": "PVR INOX Palazzo IMAX (Nexus Vijaya)", "watch_last_rows": True},
+        {"name": "PVR INOX Luxe IMAX (16th Watcher)", "url": "https://in.bookmyshow.com/cinemas/che/pvr-inox-luxe-phoenix-marketcity-velachery-chennai/buytickets/INLU/", "cinema": "PVR INOX Luxe IMAX (Phoenix Marketcity)", "watch_last_rows": True}
+    ]
+
     discoveries = []
-    if status == 200 and keyword in html.lower():
-        eval_res = evaluate_show_eligibility("PVR INOX Basera Mall (ECR)", "Live Booking")
-        item = {
-            "title": keyword.upper(),
-            "platform": "BookMyShow",
-            "url": "https://in.bookmyshow.com/cinemas/che/pvr-inox-basera-ecr-chennai/buytickets/BSER/",
-            "city": city,
-            "cinema": "PVR INOX Basera Mall (ECR)",
-            "showDate": "Live Now",
-            "format": "IMAX Laser",
-            "status": "BASERA MALL BMS SHOWS LIVE!",
-            "ruleType": eval_res["ruleType"],
-            "badge": eval_res["badge"]
-        }
-        discoveries.append(item)
-        dispatch_alerts(item)
+    for tgt in targets:
+        status, html = fetch_url(tgt["url"], headers=headers)
+        if status != 200:
+            continue
+        has_movie = keyword in html.lower()
+
+        if tgt.get("watch_last_rows"):
+            has_16th = bool(re.search(r'(?:16th|-16\b|16-|\b16\b)', html, re.I))
+            if has_movie or has_16th:
+                has_last_rows = bool(re.search(r'(?:recliners?|prime|club|elite|row\s*[p-z]|available|filling\s*fast)', html, re.I))
+                eval_res = evaluate_show_eligibility(tgt["cinema"], "16th Show", "Palazzo & Luxe 16th Radar", {
+                    "is_last_rows_open": has_last_rows,
+                    "is_late_release": True,
+                    "rows": "Last 5 Rows (Prime/VIP/Recliners)"
+                })
+                if eval_res["eligible"]:
+                    item = {
+                        "title": keyword.upper(),
+                        "platform": "BookMyShow",
+                        "url": tgt["url"],
+                        "city": city,
+                        "cinema": tgt["cinema"],
+                        "showDate": "16th Show",
+                        "rows": eval_res.get("rows"),
+                        "format": "IMAX Laser (1.90:1)",
+                        "status": "LAST 5 ROWS TICKETS OPENED!" if has_last_rows else "16TH SHOW LIVE ON BMS!",
+                        "ruleType": eval_res["ruleType"],
+                        "badge": eval_res["badge"]
+                    }
+                    discoveries.append(item)
+                    dispatch_alerts(item)
+        elif tgt.get("is_basera") and has_movie:
+            eval_res = evaluate_show_eligibility("PVR INOX Basera Mall (ECR)", "Live Booking")
+            item = {
+                "title": keyword.upper(),
+                "platform": "BookMyShow",
+                "url": tgt["url"],
+                "city": city,
+                "cinema": "PVR INOX Basera Mall (ECR)",
+                "showDate": "Live Now",
+                "format": "IMAX Laser",
+                "status": "BASERA MALL BMS SHOWS LIVE!",
+                "ruleType": eval_res["ruleType"],
+                "badge": eval_res["badge"]
+            }
+            discoveries.append(item)
+            dispatch_alerts(item)
 
     return discoveries
 
 def run_sweep():
     print(f"\n========================================================")
     print(f"[Arrakis Radar] Mission-Critical Sweep Started at {datetime.now().strftime('%H:%M:%S')}")
-    print(f"Rules: 1) Basera Mall Alone (All Dates) | 2) Other Theatres (16th Shows Alone)")
+    print(f"Rules: 1) Basera Mall (All Dates) | 2) Palazzo & Luxe (16th Last 5 Rows Radar) | 3) Other (16th Shows)")
     print(f"Active Persisted State Keys: {len(NOTIFIED_KEYS)}")
     print(f"========================================================")
 
@@ -400,7 +486,7 @@ def run_sweep():
     return all_res
 
 def test_alert():
-    print("[Test] Sending simulated test alerts for Basera Mall and 16th Shows...")
+    print("[Test] Sending simulated test alerts for Basera Mall, 16th Shows, and Last 5 Rows...")
     mock_basera = {
         "title": "DUNE 3: MESSIAH (CHENNAI IMAX LASER)",
         "platform": "District & BookMyShow [TEST]",
@@ -425,8 +511,22 @@ def test_alert():
         "ruleType": "OTHER_THEATRE_16TH",
         "badge": "📅 16TH SHOW EXCLUSIVE (PVR Palazzo IMAX)"
     }
+    mock_last_rows = {
+        "title": "DUNE 3: MESSIAH (CHENNAI IMAX LASER)",
+        "platform": "BookMyShow & District [LAST 5 ROWS RADAR]",
+        "url": "https://in.bookmyshow.com/cinemas/che/pvr-palazzo-the-nexus-vijaya-mall-vadapalani-chennai/buytickets/PALZ/",
+        "city": CONFIG["CITY"],
+        "cinema": "PVR INOX Palazzo IMAX (Nexus Vijaya Vadapalani)",
+        "showDate": "December 16th (Close to Showtime)",
+        "rows": "Last 5 Rows (Rows P, Q, R, S, T - Prime Recliner)",
+        "format": "IMAX Laser (1.90:1)",
+        "status": "LAST 5 ROWS RELEASED ONLINE CLOSE TO SHOWTIME!",
+        "ruleType": "LAST_5_ROWS_LATE_RELEASE",
+        "badge": "💺 LAST 5 ROWS RELEASED (Palazzo IMAX - 16th)"
+    }
     dispatch_alerts(mock_basera)
     dispatch_alerts(mock_16th)
+    dispatch_alerts(mock_last_rows)
     print("[Test] Completed simulated test alerts.")
 
 if __name__ == "__main__":
